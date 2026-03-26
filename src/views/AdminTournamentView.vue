@@ -815,8 +815,13 @@ async function saveManualPairs() {
     }
   }
 
+  const wasEditMode = pairingEditMode.value
   closeManualPairing()
-  await loadEntries()
+  if (wasEditMode) {
+    await loadAll()
+  } else {
+    await loadEntries()
+  }
 }
 
 function openEditPairing() {
@@ -1400,7 +1405,7 @@ onBeforeUnmount(() => {
                 <span class="badge badge--success">{{ approvedEntries.length }}</span>
               </h3>
               <button
-                v-if="hasPairedEntries && !hasBracket"
+                v-if="hasPairedEntries"
                 class="btn btn--ghost btn--sm"
                 type="button"
                 :disabled="actionLoading"

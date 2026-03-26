@@ -846,10 +846,17 @@ begin
   end if;
 
   if exists (
-    select 1 from matches where tournament_id = p_tournament_id
+    select 1 from tournaments
+    where id = p_tournament_id
+      and status in ('in_progress', 'completed')
   ) then
-    raise exception 'Cannot split pairs after bracket has been generated';
+    raise exception 'Cannot edit pairs while tournament is in progress or completed';
   end if;
+
+  delete from match_sets where match_id in (
+    select id from matches where tournament_id = p_tournament_id
+  );
+  delete from matches where tournament_id = p_tournament_id;
 
   for v_entry in
     select e.id, e.phone_or_email
