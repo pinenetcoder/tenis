@@ -234,8 +234,10 @@ onBeforeUnmount(() => {
       <p class="muted">{{ t('actions.loading') }}</p>
     </section>
 
-    <section v-else-if="errorText && !tournament" class="card">
-      <p class="error-text">{{ errorText }}</p>
+    <section v-else-if="errorText && !tournament" class="card empty-state">
+      <svg class="empty-state__icon" width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="20"/><path d="M16 16l16 16"/><path d="M32 16L16 32"/></svg>
+      <p class="empty-state__title">{{ errorText }}</p>
+      <p class="empty-state__hint">{{ t('errors.checkLink') }}</p>
     </section>
 
     <template v-else-if="tournament">

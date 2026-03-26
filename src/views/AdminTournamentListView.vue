@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import { supabase } from '../lib/supabase'
@@ -8,6 +8,7 @@ import { copyTournamentLink } from '../lib/shareLink'
 import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
+const router = useRouter()
 const auth = useAuthStore()
 
 const loading = ref(false)
@@ -181,13 +182,17 @@ onMounted(async () => {
     <p v-if="loadError" class="error-text">{{ loadError }}</p>
 
     <div v-if="!loading && filteredTournaments.length" class="stack stack--sm">
-      <article v-for="item in filteredTournaments" :key="item.id" class="tournament-row">
+      <article
+        v-for="item in filteredTournaments"
+        :key="item.id"
+        class="tournament-row tournament-row--clickable"
+        tabindex="0"
+        role="link"
+        @click="router.push({ name: 'admin-tournament', params: { id: item.id } })"
+        @keydown.enter="router.push({ name: 'admin-tournament', params: { id: item.id } })"
+      >
         <div class="stack stack--sm" style="flex: 1; min-width: 0">
-          <h2 class="tournament-row__title">
-            <RouterLink :to="{ name: 'admin-tournament', params: { id: item.id } }">
-              {{ item.name }}
-            </RouterLink>
-          </h2>
+          <h2 class="tournament-row__title">{{ item.name }}</h2>
           <div class="badge-row">
             <span class="badge" :class="statusBadgeClass(item.status)">
               {{ t(`tournament.${item.status}`) }}
@@ -201,7 +206,7 @@ onMounted(async () => {
             v-if="hasPublicShareLink(item.status)"
             class="btn btn--ghost btn--sm"
             type="button"
-            @click="onCopyLink(item.slug, $event)"
+            @click.stop="onCopyLink(item.slug, $event)"
           >
             {{ copyFeedback && copySlug === item.slug ? t('share.copied') : t('share.copyLink') }}
           </button>

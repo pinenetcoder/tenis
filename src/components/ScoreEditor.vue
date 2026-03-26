@@ -80,14 +80,28 @@ const matchesByRound = computed(() => {
     }))
 })
 
+const totalRounds = computed(() => {
+  if (!matchesByRound.value.length) return 0
+  return Math.max(...matchesByRound.value.map((g) => g.roundNumber))
+})
+
+function roundLabel(roundNumber) {
+  const n = totalRounds.value
+  if (n === 0) return ''
+  if (roundNumber === n) return t('bracket.final')
+  if (roundNumber === n - 1) return t('bracket.semifinals')
+  if (roundNumber === n - 2) return t('bracket.quarterfinals')
+  return t('bracket.roundN', { n: roundNumber })
+}
+
 const isDoubles = computed(() => props.category === 'doubles')
 
-function memberLines(entryId) {
+function teamLabel(entryId) {
   if (!entryId) {
-    return [t('bracket.tbd')]
+    return t('bracket.tbd')
   }
   const names = entryMemberNames(props.entriesMap[entryId])
-  return names.length ? names : [t('bracket.tbd')]
+  return names.length ? names.join(' / ') : t('bracket.tbd')
 }
 
 function canScore(match) {
@@ -144,66 +158,78 @@ async function save(match) {
 
     <template v-for="group in matchesByRound" :key="group.roundNumber">
       <h3 class="section-title" style="font-size: 1rem; margin-top: var(--space-3)">
-        {{ t('bracket.roundN', { n: group.roundNumber }) }}
+        {{ roundLabel(group.roundNumber) }}
       </h3>
 
       <article
         v-for="match in group.matches"
         :key="match.id"
         class="score-match"
-        :class="{ 'score-match--saved': savedFlash[match.id] }"
+        :class="{ 'score-match--saved': savedFlash[match.id], 'score-match--pending': !canScore(match) }"
       >
         <div class="score-match__head" :class="{ 'score-match__head--doubles': isDoubles }">
           <div class="score-match__teams">
             <div class="score-match__team">
-              <span
-                v-for="(n, i) in memberLines(match.side_a_entry_id)"
-                :key="`a-${match.id}-${i}`"
-                class="score-match__player"
-              >{{ n }}</span>
+              <span class="score-match__player">{{ teamLabel(match.side_a_entry_id) }}</span>
             </div>
             <span class="score-match__vs muted">vs</span>
             <div class="score-match__team">
-              <span
-                v-for="(n, i) in memberLines(match.side_b_entry_id)"
-                :key="`b-${match.id}-${i}`"
-                class="score-match__player"
-              >{{ n }}</span>
+              <span class="score-match__player">{{ teamLabel(match.side_b_entry_id) }}</span>
             </div>
           </div>
         </div>
 
-        <div class="score-match__sets">
-          <div
-            v-for="row in setForms[match.id] || []"
-            :key="`${match.id}-${row.set_index}`"
-            class="score-set-row"
-          >
-            <span class="score-set-row__label">{{ t('tournament.sets') }} {{ row.set_index }}</span>
-            <div class="score-set-row__inputs">
-              <label class="score-set">
-                <span class="label">A</span>
-                <input
-                  v-model="row.side_a_games"
-                  type="number"
-                  min="0"
-                  max="7"
-                  class="input"
-                  :disabled="!canScore(match) || row.saving"
-                />
-              </label>
-              <span class="muted" aria-hidden="true">:</span>
-              <label class="score-set">
-                <span class="label">B</span>
-                <input
-                  v-model="row.side_b_games"
-                  type="number"
-                  min="0"
-                  max="7"
-                  class="input"
-                  :disabled="!canScore(match) || row.saving"
-                />
-              </label>
+        <div class="score-grid">
+          <div class="score-grid__header">
+            <div class="score-grid__player-col"></div>
+            <div
+              v-for="row in setForms[match.id] || []"
+              :key="`h-${match.id}-${row.set_index}`"
+              class="score-grid__set-col"
+            >
+              {{ row.set_index }}
+            </div>
+          </div>
+
+          <div class="score-grid__row">
+            <div class="score-grid__player-col score-grid__player-name">
+              {{ teamLabel(match.side_a_entry_id) }}
+            </div>
+            <div
+              v-for="row in setForms[match.id] || []"
+              :key="`a-${match.id}-${row.set_index}`"
+              class="score-grid__set-col"
+            >
+              <input
+                v-model="row.side_a_games"
+                type="number"
+                min="0"
+                max="7"
+                class="score-grid__input"
+                :disabled="!canScore(match) || row.saving"
+                :placeholder="'—'"
+              />
+            </div>
+          </div>
+
+          <div class="score-grid__row">
+            <div class="score-grid__player-col score-grid__player-name">
+              {{ teamLabel(match.side_b_entry_id) }}
+            </div>
+            <div
+              v-for="row in setForms[match.id] || []"
+              :key="`b-${match.id}-${row.set_index}`"
+              class="score-grid__set-col"
+            >
+              <input
+                v-model="row.side_b_games"
+                type="number"
+                min="0"
+                max="7"
+                class="score-grid__input"
+                :disabled="!canScore(match) || row.saving"
+                :placeholder="'—'"
+              />
             </div>
           </div>
         </div>

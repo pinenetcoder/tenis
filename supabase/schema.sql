@@ -1175,6 +1175,84 @@ begin
 end;
 $$;
 
+create or replace function add_tournament_admin_by_email(
+  p_tournament_id uuid,
+  p_email text,
+  p_role text default 'editor'
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+begin
+  if not is_tournament_admin(p_tournament_id) then
+    raise exception 'Not authorized';
+  end if;
+
+  select id into v_user_id
+  from auth.users
+  where email = lower(trim(p_email));
+
+  if v_user_id is null then
+    raise exception 'User with email % not found', p_email;
+  end if;
+
+  insert into tournament_admins (tournament_id, user_id, role)
+  values (p_tournament_id, v_user_id, p_role)
+  on conflict (tournament_id, user_id)
+  do update set role = excluded.role;
+end;
+$$;
+
+create or replace function remove_tournament_admin(
+  p_tournament_id uuid,
+  p_admin_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not is_tournament_admin(p_tournament_id) then
+    raise exception 'Not authorized';
+  end if;
+
+  delete from tournament_admins
+  where id = p_admin_id
+    and tournament_id = p_tournament_id;
+end;
+$$;
+
+create or replace function get_tournament_admins_with_email(p_tournament_id uuid)
+returns table (
+  id uuid,
+  user_id uuid,
+  email text,
+  role text,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not is_tournament_admin(p_tournament_id) then
+    raise exception 'Not authorized';
+  end if;
+
+  return query
+    select ta.id, ta.user_id, u.email::text, ta.role, ta.created_at
+    from tournament_admins ta
+    join auth.users u on u.id = ta.user_id
+    where ta.tournament_id = p_tournament_id
+    order by ta.created_at asc;
+end;
+$$;
+
 alter table tournaments enable row level security;
 alter table tournament_admins enable row level security;
 alter table entries enable row level security;
@@ -1444,6 +1522,9 @@ grant execute on function form_random_pairs(uuid) to authenticated;
 grant execute on function form_manual_pairs(uuid, jsonb) to authenticated;
 grant execute on function split_pairs(uuid) to authenticated;
 grant execute on function apply_bracket_layout(uuid, jsonb) to authenticated;
+grant execute on function add_tournament_admin_by_email(uuid, text, text) to authenticated;
+grant execute on function remove_tournament_admin(uuid, uuid) to authenticated;
+grant execute on function get_tournament_admins_with_email(uuid) to authenticated;
 
 -- Idempotent: skip if table is already in supabase_realtime publication
 do $$

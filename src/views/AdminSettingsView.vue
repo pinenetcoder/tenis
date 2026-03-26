@@ -2,7 +2,6 @@
 import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
@@ -14,15 +13,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="stack" style="max-width: 560px">
+  <div class="stack" style="max-width: 720px">
     <h1 class="page-title">{{ t('admin.settingsTitle') }}</h1>
-    <p class="muted">{{ t('admin.settingsIntro') }}</p>
-
-    <section class="card stack stack--sm">
-      <h2 class="section-title">{{ t('admin.settingsLanguage') }}</h2>
-      <p class="muted">{{ t('admin.settingsLanguageHint') }}</p>
-      <LanguageSwitcher />
-    </section>
 
     <section class="card stack stack--sm">
       <h2 class="section-title">{{ t('admin.settingsAccount') }}</h2>

@@ -56,7 +56,7 @@ const bracketEditing = ref(false)
 const localMatches = ref([])
 
 const addAdminForm = reactive({
-  userId: '',
+  email: '',
   role: 'editor',
 })
 
@@ -379,14 +379,14 @@ async function loadMatchesAndSets() {
 }
 
 async function loadAdmins() {
-  const { data, error } = await supabase
-    .from('tournament_admins')
-    .select('id, user_id, role, created_at')
-    .eq('tournament_id', props.id)
-    .order('created_at', { ascending: true })
+  const { data, error } = await supabase.rpc('get_tournament_admins_with_email', {
+    p_tournament_id: props.id,
+  })
 
   if (error) {
-    throw error
+    console.warn('loadAdmins:', error.message)
+    admins.value = []
+    return
   }
 
   admins.value = data || []
@@ -854,6 +854,9 @@ function openEditPairing() {
   manualPairSlots.value = slots
   pairingEditMode.value = true
   manualPairingOpen.value = true
+  nextTick(() => {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+  })
 }
 
 async function generateBracket() {
@@ -871,6 +874,29 @@ async function generateBracket() {
     p_mode: drawMode.value,
     p_manual_order: null,
   })
+
+  actionLoading.value = false
+
+  if (error) {
+    errorText.value = error.message
+    return
+  }
+
+  await loadAll()
+}
+
+async function resetBracket() {
+  if (!window.confirm(t('admin.resetBracketConfirm'))) {
+    return
+  }
+
+  actionLoading.value = true
+  errorText.value = ''
+
+  const { error } = await supabase
+    .from('matches')
+    .delete()
+    .eq('tournament_id', props.id)
 
   actionLoading.value = false
 
@@ -966,17 +992,17 @@ async function saveBracketLayout() {
 }
 
 async function addAdmin() {
-  if (!addAdminForm.userId) {
+  if (!addAdminForm.email) {
     return
   }
 
   actionLoading.value = true
   errorText.value = ''
 
-  const { error } = await supabase.from('tournament_admins').insert({
-    tournament_id: props.id,
-    user_id: addAdminForm.userId,
-    role: addAdminForm.role,
+  const { error } = await supabase.rpc('add_tournament_admin_by_email', {
+    p_tournament_id: props.id,
+    p_email: addAdminForm.email,
+    p_role: addAdminForm.role,
   })
 
   actionLoading.value = false
@@ -986,8 +1012,27 @@ async function addAdmin() {
     return
   }
 
-  addAdminForm.userId = ''
+  addAdminForm.email = ''
   addAdminForm.role = 'editor'
+  await loadAll()
+}
+
+async function removeAdmin(adminId) {
+  actionLoading.value = true
+  errorText.value = ''
+
+  const { error } = await supabase.rpc('remove_tournament_admin', {
+    p_tournament_id: props.id,
+    p_admin_id: adminId,
+  })
+
+  actionLoading.value = false
+
+  if (error) {
+    errorText.value = error.message
+    return
+  }
+
   await loadAll()
 }
 
@@ -1132,7 +1177,7 @@ onBeforeUnmount(() => {
           <div class="admin-tournament-overview__actions">
             <button
               v-if="showPublicShareActions"
-              class="btn btn--ghost btn--sm"
+              class="btn btn--warn btn--sm"
               type="button"
               @click="onCopyShareLink"
             >
@@ -1145,7 +1190,7 @@ onBeforeUnmount(() => {
               :data-tooltip="!canStartTournament ? t('admin.startTournamentTooltip') : undefined"
             >
               <button
-                class="btn btn--primary btn--sm"
+                class="btn btn--success btn--sm"
                 type="button"
                 :disabled="!canStartTournament || actionLoading"
                 @click="startTournament"
@@ -1396,7 +1441,7 @@ onBeforeUnmount(() => {
           <div class="divider" />
 
           <div>
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem">
               <h3 class="section-title" style="font-size: 1rem; margin: 0">
                 {{ t('admin.approvedList') }}
                 <span class="badge badge--success">{{ approvedEntries.length }}</span>
@@ -1653,7 +1698,7 @@ onBeforeUnmount(() => {
         class="tab-panel"
         :class="{ 'tab-panel--active': activeTab === 'bracket' }"
       >
-        <section class="card stack stack--sm">
+        <section v-if="!isTournamentActive" class="card stack stack--sm">
           <h2 class="section-title">{{ t('tournament.bracket') }} — {{ t('admin.drawSection') }}</h2>
 
           <div class="form-field" style="max-width: 280px">
@@ -1664,20 +1709,39 @@ onBeforeUnmount(() => {
             </select>
           </div>
 
-          <button
-            class="btn btn--sm"
-            :class="hasBracket ? 'btn--danger' : 'btn--primary'"
-            type="button"
-            :disabled="actionLoading"
-            @click="generateBracket"
-          >
-            {{ hasBracket
-              ? t('admin.rebuild')
-              : drawMode === 'manual' ? t('admin.generateManual') : t('admin.generateRandom')
-            }}
-          </button>
+          <template v-if="!hasBracket">
+            <button
+              class="btn btn--primary btn--sm"
+              type="button"
+              :disabled="actionLoading"
+              @click="generateBracket"
+            >
+              {{ drawMode === 'manual' ? t('admin.generateManual') : t('admin.generateRandom') }}
+            </button>
 
-          <p v-if="drawMode === 'manual'" class="muted">{{ t('admin.manualBracketDnDHint') }}</p>
+            <p v-if="drawMode === 'manual'" class="muted">{{ t('admin.manualBracketDnDHint') }}</p>
+          </template>
+
+          <template v-else>
+            <div class="inline-actions">
+              <button
+                class="btn btn--danger btn--sm"
+                type="button"
+                :disabled="actionLoading"
+                @click="generateBracket"
+              >
+                {{ t('admin.rebuild') }}
+              </button>
+              <button
+                class="btn btn--ghost btn--sm"
+                type="button"
+                :disabled="actionLoading"
+                @click="resetBracket"
+              >
+                {{ t('admin.resetBracket') }}
+              </button>
+            </div>
+          </template>
         </section>
 
         <section class="card stack stack--sm" style="margin-top: var(--space-4)">
@@ -1826,25 +1890,36 @@ onBeforeUnmount(() => {
           <h2 class="section-title">{{ t('admin.admins') }}</h2>
           <div class="stack stack--sm">
             <div v-for="admin in admins" :key="admin.id" class="participant-item">
-              <code style="font-size: 0.8125rem; word-break: break-all">{{ admin.user_id }}</code>
-              <span class="badge badge--neutral">{{ t(`admin.${admin.role}`) }}</span>
+              <div>
+                <span style="font-size: 0.875rem">{{ admin.email }}</span>
+                <span class="badge badge--neutral" style="margin-left: var(--space-2)">{{ t(`admin.${admin.role}`) }}</span>
+              </div>
+              <button
+                v-if="admin.user_id !== auth.user?.id"
+                class="btn btn--ghost btn--sm"
+                type="button"
+                :disabled="actionLoading"
+                @click="removeAdmin(admin.id)"
+              >
+                {{ t('actions.remove') }}
+              </button>
             </div>
           </div>
 
           <div class="grid-2" style="margin-top: var(--space-3)">
             <div class="form-field">
-              <label for="adm-uid">{{ t('admin.userId') }}</label>
-              <input id="adm-uid" v-model="addAdminForm.userId" class="input" type="text" />
+              <label for="adm-email">{{ t('admin.adminEmail') }}</label>
+              <input id="adm-email" v-model="addAdminForm.email" class="input" type="email" :placeholder="t('admin.adminEmailPlaceholder')" />
             </div>
             <div class="form-field">
               <label for="adm-role">{{ t('admin.role') }}</label>
               <select id="adm-role" v-model="addAdminForm.role" class="input">
-                <option value="owner">{{ t('admin.owner') }}</option>
                 <option value="editor">{{ t('admin.editor') }}</option>
+                <option value="owner">{{ t('admin.owner') }}</option>
               </select>
             </div>
           </div>
-          <button class="btn btn--primary btn--sm" type="button" :disabled="actionLoading" @click="addAdmin">
+          <button class="btn btn--primary btn--sm" type="button" :disabled="actionLoading || !addAdminForm.email" @click="addAdmin">
             {{ t('admin.add') }}
           </button>
         </section>
