@@ -251,60 +251,57 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <div class="tab-group" role="tablist" :aria-label="t('tournament.tabsLabel')">
-        <button
-          type="button"
-          class="tab"
-          :class="{ 'tab--active': activeTab === 'registration' }"
-          role="tab"
-          :aria-selected="activeTab === 'registration'"
-          @click="activeTab = 'registration'"
-        >
-          {{ t('tournament.tabRegistration') }}
-        </button>
-        <button
-          type="button"
-          class="tab"
-          :class="{ 'tab--active': activeTab === 'bracket' }"
-          role="tab"
-          :aria-selected="activeTab === 'bracket'"
-          @click="activeTab = 'bracket'"
-        >
-          {{ t('tournament.tabBracket') }}
-        </button>
-      </div>
+      <template v-if="tournament.status === 'registration_open'">
+        <div class="tab-group" role="tablist" :aria-label="t('tournament.tabsLabel')">
+          <button
+            type="button"
+            class="tab"
+            :class="{ 'tab--active': activeTab === 'registration' }"
+            role="tab"
+            :aria-selected="activeTab === 'registration'"
+            @click="activeTab = 'registration'"
+          >
+            {{ t('tournament.tabRegistration') }}
+          </button>
+          <button
+            type="button"
+            class="tab tab--disabled"
+            role="tab"
+            :aria-selected="false"
+            :aria-disabled="true"
+            disabled
+          >
+            {{ t('tournament.tabBracket') }}
+          </button>
+        </div>
 
-      <div v-show="activeTab === 'registration'" role="tabpanel">
-        <div class="grid-2">
-          <div class="stack stack--sm">
-            <RegistrationForm
-              v-if="tournament.status === 'registration_open'"
-              :tournament="tournament"
-              @submitted="loadAll"
-            />
-            <div v-else class="card">
-              <h3 class="section-title">{{ t('tournament.registration') }}</h3>
-              <p class="muted">{{ t('tournament.registrationClosed') }}</p>
+        <div role="tabpanel">
+          <div class="grid-2">
+            <div class="stack stack--sm">
+              <RegistrationForm
+                :tournament="tournament"
+                @submitted="loadAll"
+              />
             </div>
-          </div>
 
-          <div class="card stack stack--sm">
-            <h3 class="section-title">{{ t('tournament.participants') }} ({{ approvedEntries.length }})</h3>
-            <div v-if="approvedEntries.length" class="participant-list">
-              <div v-for="entry in approvedEntries" :key="entry.id" class="participant-item">
-                <strong>{{ entry.display_name }}</strong>
-                <span class="badge badge--success">{{ t('tournament.approved') }}</span>
+            <div class="card stack stack--sm">
+              <h3 class="section-title">{{ t('tournament.participants') }} ({{ approvedEntries.length }})</h3>
+              <div v-if="approvedEntries.length" class="participant-list">
+                <div v-for="entry in approvedEntries" :key="entry.id" class="participant-item">
+                  <strong>{{ entry.display_name }}</strong>
+                  <span class="badge badge--success">{{ t('tournament.approved') }}</span>
+                </div>
               </div>
+              <p v-else-if="pendingEntries.length" class="alert alert--info">
+                {{ t('tournament.pendingParticipantsHint', { count: pendingEntries.length }) }}
+              </p>
+              <p v-else class="muted">{{ t('bracket.noParticipants') }}</p>
             </div>
-            <p v-else-if="pendingEntries.length" class="alert alert--info">
-              {{ t('tournament.pendingParticipantsHint', { count: pendingEntries.length }) }}
-            </p>
-            <p v-else class="muted">{{ t('bracket.noParticipants') }}</p>
           </div>
         </div>
-      </div>
+      </template>
 
-      <div v-show="activeTab === 'bracket'" role="tabpanel" class="card">
+      <div v-else class="card">
         <h3 class="section-title">{{ t('tournament.bracket') }}</h3>
         <BracketBoard :matches="matches" :sets-by-match="setsByMatch" :entries-map="entriesMap" />
       </div>

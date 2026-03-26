@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import BracketMatchCard from './BracketMatchCard.vue'
+import InfiniteCanvas from './InfiniteCanvas.vue'
 
 const props = defineProps({
   matches: {
@@ -28,7 +29,7 @@ const emit = defineEmits(['swap-slots'])
 const { t } = useI18n()
 
 const innerRef = ref(null)
-const scrollRef = ref(null)
+const canvasRef = ref(null)
 const connectorPaths = ref([])
 const svgW = ref(0)
 const svgH = ref(0)
@@ -170,13 +171,14 @@ function roundLabel(roundNumber) {
 function getBox(el, container) {
   const er = el.getBoundingClientRect()
   const cr = container.getBoundingClientRect()
+  const s = canvasRef.value?.scale ?? 1
   return {
-    left: er.left - cr.left,
-    top: er.top - cr.top,
-    right: er.right - cr.left,
-    bottom: er.bottom - cr.top,
-    width: er.width,
-    height: er.height,
+    left: (er.left - cr.left) / s,
+    top: (er.top - cr.top) / s,
+    right: (er.right - cr.left) / s,
+    bottom: (er.bottom - cr.top) / s,
+    width: er.width / s,
+    height: er.height / s,
   }
 }
 
@@ -241,7 +243,10 @@ onMounted(() => {
       ro = new ResizeObserver(scheduleUpdate)
       ro.observe(inner)
     }
-    scrollRef.value?.addEventListener('scroll', scheduleUpdate, { passive: true })
+    // Center the bracket on initial load
+    nextTick(() => {
+      canvasRef.value?.fitToView()
+    })
   })
   window.addEventListener('resize', scheduleUpdate)
 })
@@ -249,7 +254,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearTimeout(debounceTimer)
   window.removeEventListener('resize', scheduleUpdate)
-  scrollRef.value?.removeEventListener('scroll', scheduleUpdate)
   if (ro) {
     ro.disconnect()
     ro = null
@@ -262,14 +266,21 @@ watch(
   { deep: true },
 )
 
-watch(rounds, () => scheduleUpdate(), { deep: true })
+watch(rounds, (newVal, oldVal) => {
+  scheduleUpdate()
+  // Auto-center when bracket first appears or round count changes
+  if (newVal.length && (!oldVal || !oldVal.length || newVal.length !== oldVal.length)) {
+    nextTick(() => {
+      setTimeout(() => canvasRef.value?.fitToView(), 100)
+    })
+  }
+}, { deep: true })
 
 watch(splitSectionsFlat, () => scheduleUpdate(), { deep: true })
 </script>
 
 <template>
-  <div v-if="rounds.length" class="bracket-scroll" ref="scrollRef">
-    <p class="bracket-scroll-hint">{{ t('bracket.scrollHint') }}</p>
+  <InfiniteCanvas v-if="rounds.length" ref="canvasRef" @transform-change="scheduleUpdate">
     <div ref="innerRef" class="bracket-inner">
       <svg
         class="bracket-svg"
@@ -315,6 +326,6 @@ watch(splitSectionsFlat, () => scheduleUpdate(), { deep: true })
         </section>
       </div>
     </div>
-  </div>
+  </InfiniteCanvas>
   <p v-else class="muted">{{ t('bracket.empty') }}</p>
 </template>

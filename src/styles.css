@@ -411,6 +411,10 @@ textarea.input {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+select.input {
+  padding-right: 2.5rem;
+}
+
 textarea.input {
   min-height: 100px;
   resize: vertical;
@@ -486,6 +490,13 @@ textarea.input:focus {
 .tab--active {
   color: var(--primary);
   border-bottom-color: var(--primary);
+}
+
+.tab--disabled,
+.tab:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tab__badge {
@@ -856,13 +867,6 @@ textarea.input:focus {
   max-width: 72ch;
 }
 
-.admin-settings-card__hint {
-  font-size: 0.875rem;
-  line-height: 1.55;
-  margin: 0;
-  max-width: 72ch;
-}
-
 .admin-settings-fields {
   display: flex;
   flex-direction: column;
@@ -897,6 +901,86 @@ textarea.input:focus {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+/* Infinite Canvas */
+.infinite-canvas {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 400px;
+  cursor: grab;
+  background:
+    radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: center center;
+  border-radius: var(--radius);
+  touch-action: none;
+  user-select: none;
+}
+
+.infinite-canvas--panning {
+  cursor: grabbing;
+}
+
+.infinite-canvas--fullscreen {
+  min-height: 100vh;
+  border-radius: 0;
+  background-color: var(--bg);
+}
+
+.infinite-canvas__content {
+  transform-origin: 0 0;
+  will-change: transform;
+  position: relative;
+  display: inline-block;
+}
+
+.infinite-canvas__toolbar {
+  position: absolute;
+  bottom: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.ic-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ic-btn:hover {
+  background: var(--surface-hover);
+}
+
+.ic-btn:active {
+  background: var(--border);
+}
+
+.ic-zoom-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  min-width: 40px;
+  text-align: center;
+  user-select: none;
 }
 
 /* Bracket */

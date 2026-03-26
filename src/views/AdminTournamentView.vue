@@ -170,7 +170,6 @@ const hasTournamentSettingsChanges = computed(() => {
     statusValue.value !== b.status ||
     Boolean(tournament.value.is_public) !== b.is_public ||
     settingsForm.name !== b.name ||
-    settingsForm.slug !== b.slug ||
     settingsForm.description !== b.description ||
     settingsForm.category !== b.category ||
     settingsForm.set_format !== b.set_format ||
@@ -594,7 +593,6 @@ async function saveTournamentSettings() {
       status: statusValue.value,
       is_public: tournament.value.is_public,
       name: settingsForm.name,
-      slug: settingsForm.slug,
       description: settingsForm.description || null,
       category: settingsForm.category,
       set_format: settingsForm.set_format,
@@ -1168,7 +1166,6 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <p v-if="showPublicShareActions" class="muted admin-share-hint">{{ t('share.hint') }}</p>
       </section>
 
       <div role="tablist" class="tab-group" @keydown="onTabKeydown">
@@ -1741,7 +1738,6 @@ onBeforeUnmount(() => {
             <h2 id="adm-settings-heading" class="section-title" style="margin-bottom: var(--space-2)">
               {{ t('admin.tournamentSettings') }}
             </h2>
-            <p class="muted admin-settings-card__hint">{{ t('admin.tournamentSettingsHint') }}</p>
           </div>
 
           <div class="form-field">
@@ -1752,17 +1748,6 @@ onBeforeUnmount(() => {
               class="input"
               type="text"
               required
-              :disabled="isSettingsDropdownDisabled"
-            />
-          </div>
-
-          <div class="form-field">
-            <label for="adm-slug">{{ t('admin.slug') }}</label>
-            <input
-              id="adm-slug"
-              v-model="settingsForm.slug"
-              class="input"
-              type="text"
               :disabled="isSettingsDropdownDisabled"
             />
           </div>
