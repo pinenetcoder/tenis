@@ -93,7 +93,26 @@ async function loadEntriesAndMatches(tournamentId) {
     throw matchesError
   }
 
-  entries.value = entriesData || []
+  const entryRows = entriesData || []
+  const ids = entryRows.map((e) => e.id)
+
+  if (ids.length) {
+    const { data: members } = await supabase
+      .from('entry_members')
+      .select('entry_id, member_name, member_order')
+      .in('entry_id', ids)
+      .order('member_order', { ascending: true })
+
+    const byEntry = {}
+    for (const m of members || []) {
+      ;(byEntry[m.entry_id] ??= []).push(m)
+    }
+    for (const entry of entryRows) {
+      entry.entry_members = byEntry[entry.id] || []
+    }
+  }
+
+  entries.value = entryRows
   matches.value = matchesData || []
 
   if (!matches.value.length) {
@@ -123,7 +142,7 @@ async function loadAll() {
   try {
     const { data, error } = await supabase
       .from('tournaments')
-      .select('id, name, slug, description, category, status, set_format')
+      .select('id, name, slug, description, category, status, set_format, doubles_pairing_mode')
       .eq('slug', props.slug)
       .maybeSingle()
 

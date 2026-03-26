@@ -43,6 +43,12 @@ exception
   when duplicate_object then null;
 end $$;
 
+do $$ begin
+  create type doubles_pairing_mode as enum ('pre_agreed', 'pick_random');
+exception
+  when duplicate_object then null;
+end $$;
+
 create table if not exists tournaments (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -53,6 +59,7 @@ create table if not exists tournaments (
   set_format set_format not null default 'best_of_3',
   status tournament_status not null default 'draft',
   is_public boolean not null default true,
+  doubles_pairing_mode doubles_pairing_mode,
   created_by uuid not null references auth.users (id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -332,11 +339,14 @@ begin
     raise exception 'Single entry requires one participant';
   end if;
 
-  if p_entry_type = 'doubles' and (
-    p_member_one is null or btrim(p_member_one) = '' or
-    p_member_two is null or btrim(p_member_two) = ''
-  ) then
-    raise exception 'Double entry requires two participants';
+  if p_entry_type = 'doubles' then
+    if p_member_one is null or btrim(p_member_one) = '' then
+      raise exception 'Double entry requires at least one participant';
+    end if;
+    if v_tournament.doubles_pairing_mode <> 'pick_random'
+       and (p_member_two is null or btrim(p_member_two) = '') then
+      raise exception 'Double entry requires two participants';
+    end if;
   end if;
 
   if p_phone_or_email is null or btrim(p_phone_or_email) = '' then
@@ -362,8 +372,10 @@ begin
     v_display_name := p_display_name;
   elsif p_entry_type = 'singles' then
     v_display_name := p_member_one;
-  else
+  elsif p_member_two is not null and btrim(p_member_two) <> '' then
     v_display_name := p_member_one || ' / ' || p_member_two;
+  else
+    v_display_name := p_member_one;
   end if;
 
   insert into entries (
@@ -384,7 +396,7 @@ begin
   insert into entry_members (entry_id, member_name, member_order)
   values (v_entry_id, p_member_one, 1);
 
-  if p_entry_type = 'doubles' then
+  if p_entry_type = 'doubles' and p_member_two is not null and btrim(p_member_two) <> '' then
     insert into entry_members (entry_id, member_name, member_order)
     values (v_entry_id, p_member_two, 2);
   end if;
@@ -399,7 +411,8 @@ create or replace function create_tournament(
   p_description text default null,
   p_category tournament_category default 'singles',
   p_set_format set_format default 'best_of_3',
-  p_is_public boolean default true
+  p_is_public boolean default true,
+  p_doubles_pairing_mode doubles_pairing_mode default null
 )
 returns uuid
 language plpgsql
@@ -414,8 +427,10 @@ begin
     raise exception 'Authentication required';
   end if;
 
-  insert into tournaments (name, slug, description, category, set_format, status, is_public, created_by)
-  values (p_name, p_slug, p_description, p_category, p_set_format, 'registration_open', p_is_public, v_uid)
+  insert into tournaments (name, slug, description, category, set_format, status, is_public, doubles_pairing_mode, created_by)
+  values (p_name, p_slug, p_description, p_category, p_set_format, 'registration_open', p_is_public,
+          case when p_category = 'doubles' then coalesce(p_doubles_pairing_mode, 'pre_agreed') else null end,
+          v_uid)
   returning id into v_id;
 
   insert into tournament_admins (tournament_id, user_id, role)
@@ -635,6 +650,242 @@ begin
   end if;
 
   perform generate_bracket(p_tournament_id, p_mode, p_manual_order);
+end;
+$$;
+
+create or replace function form_random_pairs(p_tournament_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_unpaired_ids uuid[];
+  v_count integer;
+  v_i integer;
+  v_entry_a uuid;
+  v_entry_b uuid;
+  v_name_a text;
+  v_name_b text;
+  v_pairs_formed integer := 0;
+begin
+  if not is_tournament_admin(p_tournament_id) then
+    raise exception 'Not allowed';
+  end if;
+
+  if not exists (
+    select 1 from tournaments
+    where id = p_tournament_id
+      and category = 'doubles'
+      and doubles_pairing_mode = 'pick_random'
+  ) then
+    raise exception 'Tournament is not configured for random pairing';
+  end if;
+
+  select array_agg(e.id order by random())
+    into v_unpaired_ids
+  from entries e
+  where e.tournament_id = p_tournament_id
+    and e.status = 'approved'
+    and e.entry_type = 'doubles'
+    and not exists (
+      select 1 from entry_members em
+      where em.entry_id = e.id and em.member_order = 2
+    );
+
+  v_count := coalesce(array_length(v_unpaired_ids, 1), 0);
+
+  if v_count = 0 then
+    return 0;
+  end if;
+
+  if v_count % 2 <> 0 then
+    raise exception 'Odd number of unpaired players (%). Remove or add one before forming pairs.', v_count;
+  end if;
+
+  v_i := 1;
+  while v_i <= v_count - 1 loop
+    v_entry_a := v_unpaired_ids[v_i];
+    v_entry_b := v_unpaired_ids[v_i + 1];
+
+    select em.member_name into v_name_a
+    from entry_members em
+    where em.entry_id = v_entry_a and em.member_order = 1;
+
+    select em.member_name into v_name_b
+    from entry_members em
+    where em.entry_id = v_entry_b and em.member_order = 1;
+
+    insert into entry_members (entry_id, member_name, member_order)
+    values (v_entry_a, v_name_b, 2);
+
+    update entries
+    set display_name = v_name_a || ' / ' || v_name_b
+    where id = v_entry_a;
+
+    delete from entry_members where entry_id = v_entry_b;
+    delete from entries where id = v_entry_b;
+
+    v_pairs_formed := v_pairs_formed + 1;
+    v_i := v_i + 2;
+  end loop;
+
+  return v_pairs_formed;
+end;
+$$;
+
+create or replace function form_manual_pairs(
+  p_tournament_id uuid,
+  p_pairs jsonb
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_pair jsonb;
+  v_entry_a uuid;
+  v_entry_b uuid;
+  v_name_a text;
+  v_name_b text;
+  v_pairs_formed integer := 0;
+begin
+  if not is_tournament_admin(p_tournament_id) then
+    raise exception 'Not allowed';
+  end if;
+
+  if not exists (
+    select 1 from tournaments
+    where id = p_tournament_id
+      and category = 'doubles'
+      and doubles_pairing_mode = 'pick_random'
+  ) then
+    raise exception 'Tournament is not configured for random pairing';
+  end if;
+
+  for v_pair in select * from jsonb_array_elements(p_pairs)
+  loop
+    v_entry_a := (v_pair->>0)::uuid;
+    v_entry_b := (v_pair->>1)::uuid;
+
+    if not exists (
+      select 1 from entries
+      where id = v_entry_a
+        and tournament_id = p_tournament_id
+        and status = 'approved'
+        and not exists (
+          select 1 from entry_members em where em.entry_id = v_entry_a and em.member_order = 2
+        )
+    ) then
+      raise exception 'Entry % is not a valid unpaired entry', v_entry_a;
+    end if;
+
+    if not exists (
+      select 1 from entries
+      where id = v_entry_b
+        and tournament_id = p_tournament_id
+        and status = 'approved'
+        and not exists (
+          select 1 from entry_members em where em.entry_id = v_entry_b and em.member_order = 2
+        )
+    ) then
+      raise exception 'Entry % is not a valid unpaired entry', v_entry_b;
+    end if;
+
+    select em.member_name into v_name_a
+    from entry_members em
+    where em.entry_id = v_entry_a and em.member_order = 1;
+
+    select em.member_name into v_name_b
+    from entry_members em
+    where em.entry_id = v_entry_b and em.member_order = 1;
+
+    insert into entry_members (entry_id, member_name, member_order)
+    values (v_entry_a, v_name_b, 2);
+
+    update entries
+    set display_name = v_name_a || ' / ' || v_name_b
+    where id = v_entry_a;
+
+    delete from entry_members where entry_id = v_entry_b;
+    delete from entries where id = v_entry_b;
+
+    v_pairs_formed := v_pairs_formed + 1;
+  end loop;
+
+  return v_pairs_formed;
+end;
+$$;
+
+create or replace function split_pairs(
+  p_tournament_id uuid
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_entry record;
+  v_member2_name text;
+  v_new_entry_id uuid;
+  v_split_count integer := 0;
+begin
+  if not is_tournament_admin(p_tournament_id) then
+    raise exception 'Not allowed';
+  end if;
+
+  if not exists (
+    select 1 from tournaments
+    where id = p_tournament_id
+      and category = 'doubles'
+      and doubles_pairing_mode = 'pick_random'
+  ) then
+    raise exception 'Tournament is not configured for random pairing';
+  end if;
+
+  if exists (
+    select 1 from matches where tournament_id = p_tournament_id
+  ) then
+    raise exception 'Cannot split pairs after bracket has been generated';
+  end if;
+
+  for v_entry in
+    select e.id, e.phone_or_email
+    from entries e
+    where e.tournament_id = p_tournament_id
+      and e.status = 'approved'
+      and exists (
+        select 1 from entry_members em
+        where em.entry_id = e.id and em.member_order = 2
+      )
+  loop
+    select em.member_name into v_member2_name
+    from entry_members em
+    where em.entry_id = v_entry.id and em.member_order = 2;
+
+    delete from entry_members
+    where entry_id = v_entry.id and member_order = 2;
+
+    update entries
+    set display_name = (
+      select em.member_name from entry_members em
+      where em.entry_id = v_entry.id and em.member_order = 1
+    )
+    where id = v_entry.id;
+
+    insert into entries (tournament_id, entry_type, display_name, phone_or_email, status)
+    values (p_tournament_id, 'doubles', v_member2_name, 'split-' || gen_random_uuid(), 'approved')
+    returning id into v_new_entry_id;
+
+    insert into entry_members (entry_id, member_name, member_order)
+    values (v_new_entry_id, v_member2_name, 1);
+
+    v_split_count := v_split_count + 1;
+  end loop;
+
+  return v_split_count;
 end;
 $$;
 
@@ -863,6 +1114,57 @@ begin
       else 'pending'::match_status
     end
   where id = p_to_match_id;
+end;
+$$;
+
+create or replace function apply_bracket_layout(
+  p_tournament_id uuid,
+  p_layout jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_item jsonb;
+  v_match_id uuid;
+  v_side_a uuid;
+  v_side_b uuid;
+  v_match matches%rowtype;
+begin
+  if not is_tournament_admin(p_tournament_id) then
+    raise exception 'Not allowed';
+  end if;
+
+  for v_item in select * from jsonb_array_elements(p_layout)
+  loop
+    v_match_id := (v_item->>'match_id')::uuid;
+    v_side_a := nullif(v_item->>'side_a_entry_id', '')::uuid;
+    v_side_b := nullif(v_item->>'side_b_entry_id', '')::uuid;
+
+    select * into v_match from matches where id = v_match_id;
+    if v_match.id is null then
+      raise exception 'Match % not found', v_match_id;
+    end if;
+    if v_match.tournament_id <> p_tournament_id then
+      raise exception 'Match does not belong to this tournament';
+    end if;
+    if v_match.status = 'finished'::match_status then
+      raise exception 'Cannot modify finished match';
+    end if;
+
+    update matches
+    set
+      side_a_entry_id = v_side_a,
+      side_b_entry_id = v_side_b,
+      winner_entry_id = null,
+      status = case
+        when v_side_a is not null and v_side_b is not null then 'ready'::match_status
+        else 'pending'::match_status
+      end
+    where id = v_match_id;
+  end loop;
 end;
 $$;
 
@@ -1125,12 +1427,16 @@ using (
   )
 );
 
-grant execute on function create_tournament(text, text, text, tournament_category, set_format, boolean) to authenticated;
+grant execute on function create_tournament(text, text, text, tournament_category, set_format, boolean, doubles_pairing_mode) to authenticated;
 grant execute on function register_entry(text, tournament_category, text, text, text, text) to anon, authenticated;
 grant execute on function generate_bracket(uuid, draw_mode, uuid[]) to authenticated;
 grant execute on function rebuild_bracket(uuid, draw_mode, uuid[]) to authenticated;
 grant execute on function update_match_sets(uuid, jsonb) to authenticated;
 grant execute on function swap_bracket_slots(uuid, uuid, text, uuid, text) to authenticated;
+grant execute on function form_random_pairs(uuid) to authenticated;
+grant execute on function form_manual_pairs(uuid, jsonb) to authenticated;
+grant execute on function split_pairs(uuid) to authenticated;
+grant execute on function apply_bracket_layout(uuid, jsonb) to authenticated;
 
 -- Idempotent: skip if table is already in supabase_realtime publication
 do $$

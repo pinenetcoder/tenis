@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { entryMemberNames } from '../lib/entryDisplay'
+
 const props = defineProps({
   match: {
     type: Object,
@@ -27,11 +29,16 @@ const { t } = useI18n()
 
 const dragOverKey = ref(null)
 
-function entryName(entryId) {
+function memberLines(entryId) {
   if (!entryId) {
-    return t('bracket.tbd')
+    return [t('bracket.tbd')]
   }
-  return props.entriesMap[entryId]?.display_name || t('bracket.tbd')
+  const names = entryMemberNames(props.entriesMap[entryId])
+  return names.length ? names : [t('bracket.tbd')]
+}
+
+function isStacked(entryId) {
+  return memberLines(entryId).length >= 2
 }
 
 function setSummary(matchId) {
@@ -122,6 +129,7 @@ function rowClass(side, entryId, winner) {
     'match-card__row--slot-editable': props.editableSlots && !matchFinished(),
     'match-card__row--drag-over': dragOverKey.value === k && props.editableSlots && !matchFinished(),
     'match-card__row--draggable': props.editableSlots && !matchFinished() && Boolean(entryId),
+    'match-card__row--stacked': isStacked(entryId),
   }
 }
 </script>
@@ -138,7 +146,10 @@ function rowClass(side, entryId, winner) {
       @dragleave="onDragLeave($event, 'a')"
       @drop="onDrop($event, 'a')"
     >
-      <span class="match-card__name">{{ entryName(match.side_a_entry_id) }}</span>
+      <div v-if="isStacked(match.side_a_entry_id)" class="match-card__members">
+        <span v-for="(n, i) in memberLines(match.side_a_entry_id)" :key="`a-${i}`" class="match-card__member">{{ n }}</span>
+      </div>
+      <span v-else class="match-card__name">{{ memberLines(match.side_a_entry_id)[0] }}</span>
     </div>
     <div
       class="match-card__row"
@@ -150,7 +161,10 @@ function rowClass(side, entryId, winner) {
       @dragleave="onDragLeave($event, 'b')"
       @drop="onDrop($event, 'b')"
     >
-      <span class="match-card__name">{{ entryName(match.side_b_entry_id) }}</span>
+      <div v-if="isStacked(match.side_b_entry_id)" class="match-card__members">
+        <span v-for="(n, i) in memberLines(match.side_b_entry_id)" :key="`b-${i}`" class="match-card__member">{{ n }}</span>
+      </div>
+      <span v-else class="match-card__name">{{ memberLines(match.side_b_entry_id)[0] }}</span>
     </div>
     <div class="match-card__meta">
       {{ t('tournament.sets') }}: <span class="match-card__score">{{ setSummary(match.id) }}</span>

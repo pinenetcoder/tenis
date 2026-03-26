@@ -50,6 +50,7 @@ async function loadTournaments() {
         category,
         status,
         set_format,
+        doubles_pairing_mode,
         created_at
       )
     `,

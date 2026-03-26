@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 
 import BracketBoard from '../components/BracketBoard.vue'
 import ScoreEditor from '../components/ScoreEditor.vue'
+import { entryMemberNames } from '../lib/entryDisplay'
 import { supabase } from '../lib/supabase'
 import { copyTournamentLink } from '../lib/shareLink'
 import { useAuthStore } from '../stores/auth'
@@ -38,6 +39,7 @@ const settingsForm = reactive({
   description: '',
   category: 'singles',
   set_format: 'best_of_3',
+  doubles_pairing_mode: 'pre_agreed',
 })
 const settingsBaseline = ref({
   status: 'draft',
@@ -47,8 +49,11 @@ const settingsBaseline = ref({
   description: '',
   category: 'singles',
   set_format: 'best_of_3',
+  doubles_pairing_mode: 'pre_agreed',
 })
 const drawMode = ref('auto-random')
+const bracketEditing = ref(false)
+const localMatches = ref([])
 
 const addAdminForm = reactive({
   userId: '',
@@ -67,6 +72,12 @@ const addEntryError = ref('')
 const addEntrySuccess = ref('')
 const addEntryContactTouched = ref(false)
 const addEntryAccordionOpen = ref(false)
+
+const manualPairingOpen = ref(false)
+const manualPairSlots = ref([])
+const manualPairingDragOver = ref(null)
+const pairingEditMode = ref(false)
+const editModePlayers = ref([])
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const phonePattern = /^\+?[\d\s\-()]{7,20}$/
@@ -106,6 +117,46 @@ const setsByMatch = computed(() => {
 const pendingEntries = computed(() => entries.value.filter((entry) => entry.status === 'pending'))
 const approvedEntries = computed(() => entries.value.filter((entry) => entry.status === 'approved'))
 
+const unpairedEntries = computed(() => {
+  if (!isPickRandomDoubles.value) return []
+  return approvedEntries.value.filter(
+    (e) => !e.entry_members || e.entry_members.length < 2
+  )
+})
+
+const unpairedCount = computed(() => unpairedEntries.value.length)
+
+const isPickRandomDoubles = computed(() =>
+  tournament.value?.category === 'doubles' && tournament.value?.doubles_pairing_mode === 'pick_random'
+)
+
+const allPairingPlayers = computed(() =>
+  pairingEditMode.value ? editModePlayers.value : unpairedEntries.value
+)
+
+const unassignedPlayers = computed(() => {
+  const assigned = new Set()
+  for (const slot of manualPairSlots.value) {
+    if (slot.playerA) assigned.add(slot.playerA.id)
+    if (slot.playerB) assigned.add(slot.playerB.id)
+  }
+  return allPairingPlayers.value.filter((e) => !assigned.has(e.id))
+})
+
+const completePairsCount = computed(() =>
+  manualPairSlots.value.filter((s) => s.playerA && s.playerB).length
+)
+
+const hasPairedEntries = computed(() => {
+  if (!isPickRandomDoubles.value) return false
+  return approvedEntries.value.some((e) => e.entry_members && e.entry_members.length >= 2)
+})
+
+function entryLabel(entry) {
+  const names = entryMemberNames(entry)
+  return names.length ? names.join(' / ') : entry.display_name
+}
+
 const showPublicShareActions = computed(() => {
   return tournament.value?.status !== 'draft'
 })
@@ -122,7 +173,8 @@ const hasTournamentSettingsChanges = computed(() => {
     settingsForm.slug !== b.slug ||
     settingsForm.description !== b.description ||
     settingsForm.category !== b.category ||
-    settingsForm.set_format !== b.set_format
+    settingsForm.set_format !== b.set_format ||
+    settingsForm.doubles_pairing_mode !== b.doubles_pairing_mode
   )
 })
 
@@ -226,7 +278,7 @@ async function assertAccess() {
 async function loadTournament() {
   const { data, error } = await supabase
     .from('tournaments')
-    .select('id, name, slug, description, category, status, set_format, is_public')
+    .select('id, name, slug, description, category, status, set_format, is_public, doubles_pairing_mode')
     .eq('id', props.id)
     .maybeSingle()
 
@@ -245,6 +297,7 @@ async function loadTournament() {
   settingsForm.description = data.description || ''
   settingsForm.category = data.category
   settingsForm.set_format = data.set_format
+  settingsForm.doubles_pairing_mode = data.doubles_pairing_mode || 'pre_agreed'
   settingsBaseline.value = {
     status: data.status,
     is_public: Boolean(data.is_public),
@@ -253,6 +306,7 @@ async function loadTournament() {
     description: data.description || '',
     category: data.category,
     set_format: data.set_format,
+    doubles_pairing_mode: data.doubles_pairing_mode || 'pre_agreed',
   }
 }
 
@@ -267,7 +321,26 @@ async function loadEntries() {
     throw error
   }
 
-  entries.value = data || []
+  const entryRows = data || []
+  const ids = entryRows.map((e) => e.id)
+
+  if (ids.length) {
+    const { data: members } = await supabase
+      .from('entry_members')
+      .select('entry_id, member_name, member_order')
+      .in('entry_id', ids)
+      .order('member_order', { ascending: true })
+
+    const byEntry = {}
+    for (const m of members || []) {
+      ;(byEntry[m.entry_id] ??= []).push(m)
+    }
+    for (const entry of entryRows) {
+      entry.entry_members = byEntry[entry.id] || []
+    }
+  }
+
+  entries.value = entryRows
 }
 
 async function loadMatchesAndSets() {
@@ -429,10 +502,12 @@ async function addEntryManually() {
   addEntryContactTouched.value = true
 
   const category = tournament.value?.category
+  const pMode = tournament.value?.doubles_pairing_mode
   const m1 = addEntryForm.memberOne.trim()
   const m2 = addEntryForm.memberTwo.trim()
 
-  if (!m1 || (category === 'doubles' && !m2)) {
+  const requireBothMembers = category === 'doubles' && pMode !== 'pick_random'
+  if (!m1 || (requireBothMembers && !m2)) {
     addEntryError.value = t('admin.addEntryInvalidMembers')
     return
   }
@@ -449,7 +524,7 @@ async function addEntryManually() {
 
   const customName = addEntryForm.displayName.trim()
   const displayName =
-    customName || (category === 'singles' ? m1 : `${m1} / ${m2}`)
+    customName || (category === 'singles' ? m1 : (m2 ? `${m1} / ${m2}` : m1))
 
   actionLoading.value = true
 
@@ -476,7 +551,7 @@ async function addEntryManually() {
   }
 
   const memberRows = [{ entry_id: entryRow.id, member_name: m1, member_order: 1 }]
-  if (category === 'doubles') {
+  if (category === 'doubles' && m2) {
     memberRows.push({ entry_id: entryRow.id, member_name: m2, member_order: 2 })
   }
 
@@ -523,6 +598,8 @@ async function saveTournamentSettings() {
       description: settingsForm.description || null,
       category: settingsForm.category,
       set_format: settingsForm.set_format,
+      doubles_pairing_mode:
+        settingsForm.category === 'doubles' ? settingsForm.doubles_pairing_mode : null,
     })
     .eq('id', props.id)
 
@@ -556,6 +633,226 @@ async function saveTournamentSettings() {
 
 const hasBracket = computed(() => matches.value.length > 0)
 
+async function formRandomPairs() {
+  if (unpairedCount.value % 2 !== 0) {
+    errorText.value = t('admin.oddUnpairedWarning', { count: unpairedCount.value })
+    return
+  }
+
+  if (!window.confirm(t('admin.formPairsConfirm'))) {
+    return
+  }
+
+  actionLoading.value = true
+  errorText.value = ''
+
+  const { error } = await supabase.rpc('form_random_pairs', {
+    p_tournament_id: props.id,
+  })
+
+  actionLoading.value = false
+
+  if (error) {
+    errorText.value = error.message
+    return
+  }
+
+  await loadEntries()
+}
+
+function openManualPairing() {
+  const count = unpairedEntries.value.length
+  const slotCount = Math.ceil(count / 2)
+  manualPairSlots.value = Array.from({ length: slotCount }, (_, i) => ({
+    slotIndex: i,
+    playerA: null,
+    playerB: null,
+  }))
+  manualPairingOpen.value = true
+}
+
+function closeManualPairing() {
+  manualPairingOpen.value = false
+  manualPairSlots.value = []
+  manualPairingDragOver.value = null
+  pairingEditMode.value = false
+  editModePlayers.value = []
+}
+
+function findEntryById(id) {
+  return allPairingPlayers.value.find((e) => e.id === id) || null
+}
+
+const isDragging = ref(false)
+
+function onPlayerDragStart(event, entry, fromSlot, fromPosition) {
+  event.dataTransfer.setData(
+    'application/json',
+    JSON.stringify({
+      entryId: entry.id,
+      fromSlot: fromSlot ?? null,
+      fromPosition: fromPosition ?? null,
+    }),
+  )
+  event.dataTransfer.effectAllowed = 'move'
+  isDragging.value = true
+}
+
+function onPlayerDragEnd() {
+  isDragging.value = false
+  manualPairingDragOver.value = null
+}
+
+function onSlotDragOver(event, slotIndex, position) {
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+  manualPairingDragOver.value = `${slotIndex}-${position}`
+}
+
+function onSlotDragLeave(event, slotIndex, position) {
+  if (event.currentTarget.contains(event.relatedTarget)) return
+  if (manualPairingDragOver.value === `${slotIndex}-${position}`) {
+    manualPairingDragOver.value = null
+  }
+}
+
+function onSlotDrop(event, slotIndex, position) {
+  event.preventDefault()
+  manualPairingDragOver.value = null
+  isDragging.value = false
+
+  let payload
+  try {
+    payload = JSON.parse(event.dataTransfer.getData('application/json') || '{}')
+  } catch {
+    return
+  }
+  if (!payload.entryId) return
+
+  const entry = findEntryById(payload.entryId)
+  if (!entry) return
+
+  const isSameSlot = payload.fromSlot === slotIndex && payload.fromPosition === position
+  if (isSameSlot) return
+
+  const slot = manualPairSlots.value[slotIndex]
+  const targetKey = position === 'A' ? 'playerA' : 'playerB'
+  const existing = slot[targetKey]
+
+  if (payload.fromSlot !== null && payload.fromSlot !== undefined) {
+    const srcSlot = manualPairSlots.value[payload.fromSlot]
+    const srcKey = payload.fromPosition === 'A' ? 'playerA' : 'playerB'
+    srcSlot[srcKey] = existing || null
+  }
+
+  slot[targetKey] = entry
+}
+
+function removeFromSlot(slotIndex, position) {
+  const key = position === 'A' ? 'playerA' : 'playerB'
+  manualPairSlots.value[slotIndex][key] = null
+}
+
+async function saveManualPairs() {
+  const completePairs = manualPairSlots.value.filter((s) => s.playerA && s.playerB)
+  if (!completePairs.length) return
+
+  actionLoading.value = true
+  errorText.value = ''
+
+  if (pairingEditMode.value) {
+    const { error: splitErr } = await supabase.rpc('split_pairs', {
+      p_tournament_id: props.id,
+    })
+    if (splitErr) {
+      actionLoading.value = false
+      errorText.value = splitErr.message
+      return
+    }
+    await loadEntries()
+
+    const nameToEntryId = {}
+    for (const e of entries.value) {
+      if (e.entry_members && e.entry_members.length === 1) {
+        nameToEntryId[e.entry_members[0].member_name] = e.id
+      }
+    }
+
+    const pairs = completePairs.map((s) => [
+      nameToEntryId[s.playerA._memberName],
+      nameToEntryId[s.playerB._memberName],
+    ]).filter((p) => p[0] && p[1])
+
+    if (!pairs.length) {
+      actionLoading.value = false
+      closeManualPairing()
+      await loadEntries()
+      return
+    }
+
+    const { error } = await supabase.rpc('form_manual_pairs', {
+      p_tournament_id: props.id,
+      p_pairs: pairs,
+    })
+
+    actionLoading.value = false
+    if (error) {
+      errorText.value = error.message
+      return
+    }
+  } else {
+    const pairs = completePairs.map((s) => [s.playerA.id, s.playerB.id])
+
+    const { error } = await supabase.rpc('form_manual_pairs', {
+      p_tournament_id: props.id,
+      p_pairs: pairs,
+    })
+
+    actionLoading.value = false
+    if (error) {
+      errorText.value = error.message
+      return
+    }
+  }
+
+  closeManualPairing()
+  await loadEntries()
+}
+
+function openEditPairing() {
+  const players = []
+  const slots = []
+  let virtualId = 0
+
+  for (const entry of approvedEntries.value) {
+    const members = entry.entry_members || []
+    const m1 = members.find((m) => m.member_order === 1)
+    const m2 = members.find((m) => m.member_order === 2)
+
+    if (m1 && m2) {
+      const playerA = { id: `edit-${virtualId++}`, display_name: m1.member_name, _sourceEntryId: entry.id, _memberName: m1.member_name, entry_members: [m1] }
+      const playerB = { id: `edit-${virtualId++}`, display_name: m2.member_name, _sourceEntryId: entry.id, _memberName: m2.member_name, entry_members: [{ ...m2, member_order: 1 }] }
+      players.push(playerA, playerB)
+      slots.push({ slotIndex: slots.length, playerA, playerB })
+    } else if (m1) {
+      const playerA = { id: entry.id, display_name: m1.member_name, _sourceEntryId: entry.id, _memberName: m1.member_name, entry_members: [m1] }
+      players.push(playerA)
+    }
+  }
+
+  const unslotted = players.filter((p) => !slots.some((s) => s.playerA === p || s.playerB === p))
+  const totalSlotCount = Math.max(slots.length, Math.ceil(players.length / 2))
+  while (slots.length < totalSlotCount) {
+    const next = unslotted.shift() || null
+    slots.push({ slotIndex: slots.length, playerA: next, playerB: null })
+  }
+
+  editModePlayers.value = players
+  manualPairSlots.value = slots
+  pairingEditMode.value = true
+  manualPairingOpen.value = true
+}
+
 async function generateBracket() {
   const fn = hasBracket.value ? 'rebuild_bracket' : 'generate_bracket'
 
@@ -582,20 +879,75 @@ async function generateBracket() {
   await loadAll()
 }
 
-async function swapBracketSlots(payload) {
+const displayMatches = computed(() =>
+  bracketEditing.value ? localMatches.value : matches.value
+)
+
+const bracketHasChanges = computed(() => {
+  if (!bracketEditing.value) return false
+  return localMatches.value.some((lm) => {
+    const orig = matches.value.find((m) => m.id === lm.id)
+    if (!orig) return false
+    return orig.side_a_entry_id !== lm.side_a_entry_id || orig.side_b_entry_id !== lm.side_b_entry_id
+  })
+})
+
+function startBracketEditing() {
+  localMatches.value = matches.value.map((m) => ({ ...m }))
+  bracketEditing.value = true
+}
+
+function cancelBracketEditing() {
+  bracketEditing.value = false
+  localMatches.value = []
+}
+
+function swapBracketSlots(payload) {
   if (!payload?.fromMatchId || !payload?.toMatchId || !payload?.fromSide || !payload?.toSide) {
+    return
+  }
+
+  if (!bracketEditing.value) {
+    startBracketEditing()
+  }
+
+  const arr = localMatches.value
+  const fromMatch = arr.find((m) => m.id === payload.fromMatchId)
+  const toMatch = arr.find((m) => m.id === payload.toMatchId)
+  if (!fromMatch || !toMatch) return
+
+  const fromKey = payload.fromSide === 'a' ? 'side_a_entry_id' : 'side_b_entry_id'
+  const toKey = payload.toSide === 'a' ? 'side_a_entry_id' : 'side_b_entry_id'
+
+  const tmp = fromMatch[fromKey]
+  fromMatch[fromKey] = toMatch[toKey]
+  toMatch[toKey] = tmp
+}
+
+async function saveBracketLayout() {
+  const changed = localMatches.value.filter((lm) => {
+    const orig = matches.value.find((m) => m.id === lm.id)
+    if (!orig) return false
+    return orig.side_a_entry_id !== lm.side_a_entry_id || orig.side_b_entry_id !== lm.side_b_entry_id
+  })
+
+  if (!changed.length) {
+    cancelBracketEditing()
     return
   }
 
   actionLoading.value = true
   errorText.value = ''
 
-  const { error } = await supabase.rpc('swap_bracket_slots', {
+  const layout = changed.map((m) => ({
+    match_id: m.id,
+    side_a_entry_id: m.side_a_entry_id || null,
+    side_b_entry_id: m.side_b_entry_id || null,
+  }))
+
+  const { error } = await supabase.rpc('apply_bracket_layout', {
     p_tournament_id: props.id,
-    p_from_match_id: payload.fromMatchId,
-    p_from_slot: payload.fromSide === 'a' ? 'A' : 'B',
-    p_to_match_id: payload.toMatchId,
-    p_to_slot: payload.toSide === 'a' ? 'A' : 'B',
+    p_layout: layout,
   })
 
   actionLoading.value = false
@@ -605,6 +957,8 @@ async function swapBracketSlots(payload) {
     return
   }
 
+  bracketEditing.value = false
+  localMatches.value = []
   await loadAll()
 }
 
@@ -927,7 +1281,7 @@ onBeforeUnmount(() => {
                       required
                     />
                   </div>
-                  <div v-if="tournament.category === 'doubles'" class="form-field">
+                  <div v-if="tournament.category === 'doubles' && !isPickRandomDoubles" class="form-field">
                     <label for="adm-add-m2">{{ t('registrationForm.memberTwo') }}</label>
                     <input
                       id="adm-add-m2"
@@ -937,6 +1291,17 @@ onBeforeUnmount(() => {
                       autocomplete="name"
                       :disabled="actionLoading"
                       required
+                    />
+                  </div>
+                  <div v-if="isPickRandomDoubles" class="form-field">
+                    <label for="adm-add-m2">{{ t('registrationForm.memberTwoOptional') }}</label>
+                    <input
+                      id="adm-add-m2"
+                      v-model="addEntryForm.memberTwo"
+                      class="input"
+                      type="text"
+                      autocomplete="name"
+                      :disabled="actionLoading"
                     />
                   </div>
                   <div class="form-field">
@@ -1002,7 +1367,7 @@ onBeforeUnmount(() => {
             </div>
             <div v-if="pendingEntries.length" class="stack stack--sm">
               <div v-for="entry in pendingEntries" :key="entry.id" class="participant-item">
-                <strong>{{ entry.display_name }}</strong>
+                <strong>{{ entryLabel(entry) }}</strong>
                 <div class="inline-actions">
                   <button
                     class="btn btn--primary btn--sm"
@@ -1029,13 +1394,25 @@ onBeforeUnmount(() => {
           <div class="divider" />
 
           <div>
-            <h3 class="section-title" style="font-size: 1rem">
-              {{ t('admin.approvedList') }}
-              <span class="badge badge--success">{{ approvedEntries.length }}</span>
-            </h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem">
+              <h3 class="section-title" style="font-size: 1rem; margin: 0">
+                {{ t('admin.approvedList') }}
+                <span class="badge badge--success">{{ approvedEntries.length }}</span>
+              </h3>
+              <button
+                v-if="hasPairedEntries && !hasBracket"
+                class="btn btn--ghost btn--sm"
+                type="button"
+                :disabled="actionLoading"
+                @click="openEditPairing"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                {{ t('admin.editPairs') }}
+              </button>
+            </div>
             <div v-if="approvedEntries.length" class="stack stack--sm">
               <div v-for="entry in approvedEntries" :key="entry.id" class="participant-item">
-                <strong>{{ entry.display_name }}</strong>
+                <strong>{{ entryLabel(entry) }}</strong>
                 <button class="btn btn--ghost btn--sm" type="button" :disabled="actionLoading" @click="updateEntryStatus(entry.id, 'pending')">
                   {{ t('admin.reopen') }}
                 </button>
@@ -1043,6 +1420,227 @@ onBeforeUnmount(() => {
             </div>
             <p v-else class="muted">{{ t('admin.noApproved') }}</p>
           </div>
+
+          <template v-if="isPickRandomDoubles && unpairedCount > 0 && !pairingEditMode">
+            <div class="divider" />
+            <div class="pairing-banner">
+              <div class="pairing-banner__info">
+                <svg class="pairing-banner__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span>
+                  {{ t('admin.unpairedCount', { count: unpairedCount }) }}
+                  <strong v-if="unpairedCount % 2 !== 0" class="pairing-banner__warning">
+                    {{ t('admin.oddUnpairedWarning', { count: unpairedCount }) }}
+                  </strong>
+                </span>
+              </div>
+              <div class="pairing-banner__actions">
+                <button
+                  class="btn btn--primary btn--sm"
+                  type="button"
+                  :disabled="actionLoading || unpairedCount % 2 !== 0"
+                  @click="formRandomPairs"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                  {{ t('admin.formPairs') }}
+                </button>
+                <button
+                  class="btn btn--sm"
+                  type="button"
+                  :disabled="actionLoading"
+                  @click="manualPairingOpen ? closeManualPairing() : openManualPairing()"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"/></svg>
+                  {{ t('admin.formPairsManually') }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="manualPairingOpen" class="manual-pairing" :class="{ 'manual-pairing--dragging': isDragging }">
+              <div class="manual-pairing-pool">
+                <h4 class="manual-pairing-pool__title">{{ t('admin.manualPairingPool') }}</h4>
+                <div v-if="unassignedPlayers.length" class="manual-pairing-pool__list">
+                  <span
+                    v-for="entry in unassignedPlayers"
+                    :key="entry.id"
+                    class="manual-pairing-pool__chip"
+                    draggable="true"
+                    @dragstart="onPlayerDragStart($event, entry, null, null)"
+                    @dragend="onPlayerDragEnd"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    {{ entryLabel(entry) }}
+                  </span>
+                </div>
+                <p v-else class="muted" style="font-size: 0.875rem">{{ t('admin.allPlayersAssigned') }}</p>
+              </div>
+
+              <div class="manual-pairing-grid">
+                <div v-for="(slot, idx) in manualPairSlots" :key="idx" class="pair-slot" :class="{ 'pair-slot--complete': slot.playerA && slot.playerB }">
+                  <span class="pair-slot__label">{{ t('admin.pairSlot', { n: idx + 1 }) }}</span>
+                  <div
+                    class="pair-slot__zone"
+                    :class="{
+                      'pair-slot__zone--filled': slot.playerA,
+                      'pair-slot__zone--drag-over': manualPairingDragOver === `${idx}-A`,
+                    }"
+                    :draggable="!!slot.playerA"
+                    @dragstart="slot.playerA && onPlayerDragStart($event, slot.playerA, idx, 'A')"
+                    @dragend="onPlayerDragEnd"
+                    @dragover="onSlotDragOver($event, idx, 'A')"
+                    @dragleave="onSlotDragLeave($event, idx, 'A')"
+                    @drop="onSlotDrop($event, idx, 'A')"
+                  >
+                    <template v-if="slot.playerA">
+                      <span class="pair-slot__player">{{ entryLabel(slot.playerA) }}</span>
+                      <button
+                        class="pair-slot__remove"
+                        type="button"
+                        aria-label="Remove"
+                        @click="removeFromSlot(idx, 'A')"
+                      >&times;</button>
+                    </template>
+                    <span v-else class="pair-slot__placeholder">{{ t('admin.emptySlot') }}</span>
+                  </div>
+                  <div
+                    class="pair-slot__zone"
+                    :class="{
+                      'pair-slot__zone--filled': slot.playerB,
+                      'pair-slot__zone--drag-over': manualPairingDragOver === `${idx}-B`,
+                    }"
+                    :draggable="!!slot.playerB"
+                    @dragstart="slot.playerB && onPlayerDragStart($event, slot.playerB, idx, 'B')"
+                    @dragend="onPlayerDragEnd"
+                    @dragover="onSlotDragOver($event, idx, 'B')"
+                    @dragleave="onSlotDragLeave($event, idx, 'B')"
+                    @drop="onSlotDrop($event, idx, 'B')"
+                  >
+                    <template v-if="slot.playerB">
+                      <span class="pair-slot__player">{{ entryLabel(slot.playerB) }}</span>
+                      <button
+                        class="pair-slot__remove"
+                        type="button"
+                        aria-label="Remove"
+                        @click="removeFromSlot(idx, 'B')"
+                      >&times;</button>
+                    </template>
+                    <span v-else class="pair-slot__placeholder">{{ t('admin.emptySlot') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="manual-pairing__footer">
+                <button
+                  class="btn btn--primary btn--sm"
+                  type="button"
+                  :disabled="actionLoading || completePairsCount === 0"
+                  @click="saveManualPairs"
+                >
+                  {{ t('admin.savePairs') }} ({{ completePairsCount }})
+                </button>
+                <button
+                  class="btn btn--ghost btn--sm"
+                  type="button"
+                  :disabled="actionLoading"
+                  @click="closeManualPairing"
+                >
+                  {{ t('actions.cancel') }}
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <div v-if="manualPairingOpen && pairingEditMode" class="manual-pairing" :class="{ 'manual-pairing--dragging': isDragging }">
+              <div class="manual-pairing-pool">
+                <h4 class="manual-pairing-pool__title">{{ t('admin.manualPairingPool') }}</h4>
+                <div v-if="unassignedPlayers.length" class="manual-pairing-pool__list">
+                  <span
+                    v-for="entry in unassignedPlayers"
+                    :key="entry.id"
+                    class="manual-pairing-pool__chip"
+                    draggable="true"
+                    @dragstart="onPlayerDragStart($event, entry, null, null)"
+                    @dragend="onPlayerDragEnd"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    {{ entryLabel(entry) }}
+                  </span>
+                </div>
+                <p v-else class="muted" style="font-size: 0.875rem">{{ t('admin.allPlayersAssigned') }}</p>
+              </div>
+
+              <div class="manual-pairing-grid">
+                <div v-for="(slot, idx) in manualPairSlots" :key="idx" class="pair-slot" :class="{ 'pair-slot--complete': slot.playerA && slot.playerB }">
+                  <span class="pair-slot__label">{{ t('admin.pairSlot', { n: idx + 1 }) }}</span>
+                  <div
+                    class="pair-slot__zone"
+                    :class="{
+                      'pair-slot__zone--filled': slot.playerA,
+                      'pair-slot__zone--drag-over': manualPairingDragOver === `${idx}-A`,
+                    }"
+                    :draggable="!!slot.playerA"
+                    @dragstart="slot.playerA && onPlayerDragStart($event, slot.playerA, idx, 'A')"
+                    @dragend="onPlayerDragEnd"
+                    @dragover="onSlotDragOver($event, idx, 'A')"
+                    @dragleave="onSlotDragLeave($event, idx, 'A')"
+                    @drop="onSlotDrop($event, idx, 'A')"
+                  >
+                    <template v-if="slot.playerA">
+                      <span class="pair-slot__player">{{ entryLabel(slot.playerA) }}</span>
+                      <button
+                        class="pair-slot__remove"
+                        type="button"
+                        aria-label="Remove"
+                        @click="removeFromSlot(idx, 'A')"
+                      >&times;</button>
+                    </template>
+                    <span v-else class="pair-slot__placeholder">{{ t('admin.emptySlot') }}</span>
+                  </div>
+                  <div
+                    class="pair-slot__zone"
+                    :class="{
+                      'pair-slot__zone--filled': slot.playerB,
+                      'pair-slot__zone--drag-over': manualPairingDragOver === `${idx}-B`,
+                    }"
+                    :draggable="!!slot.playerB"
+                    @dragstart="slot.playerB && onPlayerDragStart($event, slot.playerB, idx, 'B')"
+                    @dragend="onPlayerDragEnd"
+                    @dragover="onSlotDragOver($event, idx, 'B')"
+                    @dragleave="onSlotDragLeave($event, idx, 'B')"
+                    @drop="onSlotDrop($event, idx, 'B')"
+                  >
+                    <template v-if="slot.playerB">
+                      <span class="pair-slot__player">{{ entryLabel(slot.playerB) }}</span>
+                      <button
+                        class="pair-slot__remove"
+                        type="button"
+                        aria-label="Remove"
+                        @click="removeFromSlot(idx, 'B')"
+                      >&times;</button>
+                    </template>
+                    <span v-else class="pair-slot__placeholder">{{ t('admin.emptySlot') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="manual-pairing__footer">
+                <button
+                  class="btn btn--primary btn--sm"
+                  type="button"
+                  :disabled="actionLoading || completePairsCount === 0"
+                  @click="saveManualPairs"
+                >
+                  {{ t('admin.savePairs') }} ({{ completePairsCount }})
+                </button>
+                <button
+                  class="btn btn--ghost btn--sm"
+                  type="button"
+                  :disabled="actionLoading"
+                  @click="closeManualPairing"
+                >
+                  {{ t('actions.cancel') }}
+                </button>
+              </div>
+            </div>
         </section>
       </div>
 
@@ -1082,12 +1680,30 @@ onBeforeUnmount(() => {
 
         <section class="card stack stack--sm" style="margin-top: var(--space-4)">
           <BracketBoard
-            :matches="matches"
+            :matches="displayMatches"
             :sets-by-match="setsByMatch"
             :entries-map="entriesMap"
             :editable-slots="drawMode === 'manual' && !actionLoading"
             @swap-slots="swapBracketSlots"
           />
+          <div v-if="bracketEditing" class="inline-actions" style="margin-top: var(--space-2)">
+            <button
+              class="btn btn--primary btn--sm"
+              type="button"
+              :disabled="actionLoading || !bracketHasChanges"
+              @click="saveBracketLayout"
+            >
+              {{ t('admin.saveBracketLayout') }}
+            </button>
+            <button
+              class="btn btn--ghost btn--sm"
+              type="button"
+              :disabled="actionLoading"
+              @click="cancelBracketEditing"
+            >
+              {{ t('actions.cancel') }}
+            </button>
+          </div>
         </section>
       </div>
 
@@ -1103,6 +1719,7 @@ onBeforeUnmount(() => {
           :sets-by-match="setsByMatch"
           :entries-map="entriesMap"
           :set-format="tournament.set_format"
+          :category="tournament.category"
           @saved="loadAll"
         />
       </div>
@@ -1173,6 +1790,17 @@ onBeforeUnmount(() => {
               </select>
             </div>
           </div>
+
+          <label v-if="settingsForm.category === 'doubles'" class="checkbox-row">
+            <input
+              v-model="settingsForm.doubles_pairing_mode"
+              type="checkbox"
+              true-value="pick_random"
+              false-value="pre_agreed"
+              :disabled="isSettingsDropdownDisabled"
+            />
+            {{ t('admin.pickRandomPairs') }}
+          </label>
 
           <div class="admin-settings-fields">
             <div class="form-field admin-settings-fields__status">

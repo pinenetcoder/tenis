@@ -20,6 +20,7 @@ const form = reactive({
   category: 'singles',
   set_format: 'best_of_3',
   is_public: true,
+  doubles_pairing_random: false,
 })
 
 function slugify(value) {
@@ -53,6 +54,10 @@ async function createTournament() {
     p_category: form.category,
     p_set_format: form.set_format,
     p_is_public: form.is_public,
+    p_doubles_pairing_mode:
+      form.category === 'doubles'
+        ? (form.doubles_pairing_random ? 'pick_random' : 'pre_agreed')
+        : null,
   })
 
   saving.value = false
@@ -114,6 +119,11 @@ onMounted(async () => {
           <option value="best_of_5">{{ t('format.best_of_5') }}</option>
         </select>
       </div>
+
+      <label v-if="form.category === 'doubles'" class="checkbox-row">
+        <input v-model="form.doubles_pairing_random" type="checkbox" />
+        {{ t('admin.pickRandomPairs') }}
+      </label>
 
       <label class="checkbox-row">
         <input v-model="form.is_public" type="checkbox" />

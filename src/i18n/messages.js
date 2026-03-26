@@ -49,6 +49,7 @@ export const messages = {
       quarterfinals: 'Четвертьфинал',
       roundN: 'Раунд {n}',
       tbd: 'Ожидается',
+      vs: 'vs',
       empty: 'Сетка ещё не сформирована',
       scrollHint: 'Проведите пальцем влево, чтобы увидеть все раунды',
       noParticipants: 'Пока нет подтверждённых участников',
@@ -64,6 +65,7 @@ export const messages = {
       success: 'Заявка отправлена. Ожидайте подтверждения администратора.',
       error: 'Не удалось отправить заявку',
       invalidContact: 'Введите корректный телефон или email',
+      memberTwoOptional: 'Партнёр (по желанию)',
     },
     admin: {
       dashboardTitle: 'Панель организатора',
@@ -117,7 +119,8 @@ export const messages = {
       noPending: 'Нет заявок в ожидании',
       noApproved: 'Нет подтверждённых участников',
       manualBracketDnDHint:
-        'Сетка создаётся со случайным посевом. Перетаскивайте участников между слотами в несыгранных матчах (без введённых сетов). Сыгранные матчи недоступны для переноса.',
+        'Сетка создаётся со случайным посевом. Перетаскивайте участников между слотами, затем нажмите «Сохранить расстановку». Сыгранные матчи недоступны для переноса.',
+      saveBracketLayout: 'Сохранить расстановку',
       addEntryTitle: 'Добавить участника вручную',
       addEntryHint:
         'Игрок появится в списке заявок. Телефон или email можно не указывать — тогда будет служебный контакт (без дубликатов с публичной регистрацией).',
@@ -156,6 +159,19 @@ export const messages = {
       deleteTournament: 'Удалить турнир',
       deleteTournamentConfirm:
         'Удалить этот турнир безвозвратно? Все заявки, матчи и сетка будут удалены.',
+      pickRandomPairs: 'Игроки записываются по одному, пары назначаются случайно',
+      formPairs: 'Сформировать пары',
+      formPairsConfirm: 'Сформировать случайные пары из неспаренных игроков?',
+      unpairedCount: 'Неспаренных игроков: {count}',
+      oddUnpairedWarning: 'Нечётное количество неспаренных игроков ({count}). Добавьте или удалите одного.',
+      formPairsManually: 'Сформировать пары вручную',
+      manualPairingPool: 'Неспаренные игроки',
+      pairSlot: 'Пара {n}',
+      savePairs: 'Сохранить пары',
+      emptySlot: 'Перетащите игрока сюда',
+      allPlayersAssigned: 'Все игроки распределены',
+      editPairs: 'Редактировать пары',
+      splitPairsConfirm: 'Все текущие пары будут расформированы для повторного формирования. Продолжить?',
     },
     format: {
       best_of_3: 'До 2 сетов',
@@ -222,6 +238,7 @@ export const messages = {
       quarterfinals: 'Quarterfinals',
       roundN: 'Round {n}',
       tbd: 'TBD',
+      vs: 'vs',
       empty: 'Bracket not generated yet',
       scrollHint: 'Swipe sideways to see all rounds',
       noParticipants: 'No approved participants yet',
@@ -237,6 +254,7 @@ export const messages = {
       success: 'Registration submitted. Please wait for organizer approval.',
       error: 'Could not submit registration',
       invalidContact: 'Enter a valid phone number or email',
+      memberTwoOptional: 'Partner (optional)',
     },
     admin: {
       dashboardTitle: 'Organizer dashboard',
@@ -290,7 +308,8 @@ export const messages = {
       noPending: 'No pending entries',
       noApproved: 'No approved participants yet',
       manualBracketDnDHint:
-        'The bracket is built with a random seed. Drag players between slots in unfinished matches that have no scores yet. Finished matches cannot be edited.',
+        'The bracket is built with a random seed. Drag players between slots, then click "Save layout". Finished matches cannot be edited.',
+      saveBracketLayout: 'Save layout',
       addEntryTitle: 'Add participant manually',
       addEntryHint:
         'The player appears in the entry list. Phone or email is optional — a placeholder contact is used so it does not clash with public sign-ups.',
@@ -329,6 +348,19 @@ export const messages = {
       deleteTournament: 'Delete tournament',
       deleteTournamentConfirm:
         'Permanently delete this tournament? All entries, matches, and bracket data will be removed.',
+      pickRandomPairs: 'Players register individually, pairs formed randomly',
+      formPairs: 'Form random pairs',
+      formPairsConfirm: 'Form random pairs from unpaired players?',
+      unpairedCount: '{count} unpaired players',
+      oddUnpairedWarning: 'Odd number of unpaired players ({count}). Add or remove one before forming pairs.',
+      formPairsManually: 'Form pairs manually',
+      manualPairingPool: 'Unpaired players',
+      pairSlot: 'Pair {n}',
+      savePairs: 'Save pairs',
+      emptySlot: 'Drop a player here',
+      allPlayersAssigned: 'All players assigned',
+      editPairs: 'Edit pairs',
+      splitPairsConfirm: 'All current pairs will be split for re-pairing. Continue?',
     },
     format: {
       best_of_3: 'Best of 3',
@@ -395,6 +427,7 @@ export const messages = {
       quarterfinals: 'Ketvirtfinalis',
       roundN: '{n} raundas',
       tbd: 'Laukiama',
+      vs: 'prieš',
       empty: 'Tinklelis dar nesugeneruotas',
       scrollHint: 'Perbraukite į šoną, kad pamatytumėte visus raundus',
       noParticipants: 'Kol kas nėra patvirtintų dalyvių',
@@ -410,6 +443,7 @@ export const messages = {
       success: 'Paraiška pateikta. Laukite organizatoriaus patvirtinimo.',
       error: 'Nepavyko pateikti paraiškos',
       invalidContact: 'Įveskite teisingą telefono numerį arba el. paštą',
+      memberTwoOptional: 'Partneris (nebūtina)',
     },
     admin: {
       dashboardTitle: 'Organizatoriaus skydelis',
@@ -463,7 +497,8 @@ export const messages = {
       noPending: 'Nėra laukiančių paraiškų',
       noApproved: 'Nėra patvirtintų dalyvių',
       manualBracketDnDHint:
-        'Tinklelis sukuriamas su atsitiktiniu pasė. Vilkite dalyvius tarp vietų nebaigtuose mačuose be įvestų setų. Baigtų mačų keisti negalima.',
+        'Tinklelis sukuriamas su atsitiktiniu pasė. Vilkite dalyvius tarp vietų, tada spauskite „Išsaugoti išdėstymą". Baigtų mačų keisti negalima.',
+      saveBracketLayout: 'Išsaugoti išdėstymą',
       addEntryTitle: 'Pridėti dalyvį rankiniu būdu',
       addEntryHint:
         'Žaidėjas atsiras paraiškų sąraše. Telefonas arba el. paštas neprivalomi — bus techninis kontaktas, kad nesikirstų su vieša registracija.',
@@ -502,6 +537,19 @@ export const messages = {
       deleteTournament: 'Ištrinti turnyrą',
       deleteTournamentConfirm:
         'Neatšaukiamai ištrinti šį turnyrą? Visos paraiškos, mačai ir tinklelis bus pašalinti.',
+      pickRandomPairs: 'Žaidėjai registruojasi po vieną, poros sudaromos atsitiktinai',
+      formPairs: 'Sudaryti poras',
+      formPairsConfirm: 'Sudaryti atsitiktines poras iš nesuporuotų žaidėjų?',
+      unpairedCount: 'Nesuporuotų žaidėjų: {count}',
+      oddUnpairedWarning: 'Nelyginis nesuporuotų žaidėjų skaičius ({count}). Pridėkite arba pašalinkite vieną.',
+      formPairsManually: 'Sudaryti poras rankiniu būdu',
+      manualPairingPool: 'Nesuporuoti žaidėjai',
+      pairSlot: 'Pora {n}',
+      savePairs: 'Išsaugoti poras',
+      emptySlot: 'Nutempkite žaidėją čia',
+      allPlayersAssigned: 'Visi žaidėjai priskirti',
+      editPairs: 'Redaguoti poras',
+      splitPairsConfirm: 'Visos esamos poros bus išardytos perpakavimui. Tęsti?',
     },
     format: {
       best_of_3: 'Best of 3',

@@ -2,6 +2,7 @@
 import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { entryMemberNames } from '../lib/entryDisplay'
 import { supabase } from '../lib/supabase'
 
 const props = defineProps({
@@ -20,6 +21,10 @@ const props = defineProps({
   setFormat: {
     type: String,
     default: 'best_of_3',
+  },
+  category: {
+    type: String,
+    default: 'singles',
   },
 })
 
@@ -75,11 +80,14 @@ const matchesByRound = computed(() => {
     }))
 })
 
-function entryName(entryId) {
+const isDoubles = computed(() => props.category === 'doubles')
+
+function memberLines(entryId) {
   if (!entryId) {
-    return t('bracket.tbd')
+    return [t('bracket.tbd')]
   }
-  return props.entriesMap[entryId]?.display_name || t('bracket.tbd')
+  const names = entryMemberNames(props.entriesMap[entryId])
+  return names.length ? names : [t('bracket.tbd')]
 }
 
 function canScore(match) {
@@ -145,10 +153,24 @@ async function save(match) {
         class="score-match"
         :class="{ 'score-match--saved': savedFlash[match.id] }"
       >
-        <div class="score-match__head">
-          {{ entryName(match.side_a_entry_id) }}
-          <span class="muted" style="margin: 0 0.35rem">vs</span>
-          {{ entryName(match.side_b_entry_id) }}
+        <div class="score-match__head" :class="{ 'score-match__head--doubles': isDoubles }">
+          <div class="score-match__teams">
+            <div class="score-match__team">
+              <span
+                v-for="(n, i) in memberLines(match.side_a_entry_id)"
+                :key="`a-${match.id}-${i}`"
+                class="score-match__player"
+              >{{ n }}</span>
+            </div>
+            <span class="score-match__vs muted">vs</span>
+            <div class="score-match__team">
+              <span
+                v-for="(n, i) in memberLines(match.side_b_entry_id)"
+                :key="`b-${match.id}-${i}`"
+                class="score-match__player"
+              >{{ n }}</span>
+            </div>
+          </div>
         </div>
 
         <div class="score-match__sets">

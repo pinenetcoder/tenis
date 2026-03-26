@@ -15,6 +15,9 @@ const emit = defineEmits(['submitted'])
 
 const { t } = useI18n()
 const entryType = computed(() => props.tournament.category)
+const pairingMode = computed(() => props.tournament.doubles_pairing_mode || 'pre_agreed')
+const showMemberTwo = computed(() => entryType.value === 'doubles' && pairingMode.value === 'pre_agreed')
+const showMemberTwoOptional = computed(() => entryType.value === 'doubles' && pairingMode.value === 'pick_random')
 
 const form = reactive({
   displayName: '',
@@ -50,12 +53,16 @@ async function submit() {
     return
   }
 
+  const memberTwo = entryType.value === 'doubles' && form.memberTwo.trim()
+    ? form.memberTwo
+    : null
+
   const { error } = await supabase.rpc('register_entry', {
     p_slug: props.tournament.slug,
     p_entry_type: entryType.value,
     p_phone_or_email: form.phoneOrEmail,
     p_member_one: form.memberOne,
-    p_member_two: entryType.value === 'doubles' ? form.memberTwo : null,
+    p_member_two: memberTwo,
     p_display_name: form.displayName || null,
   })
 
@@ -99,7 +106,7 @@ async function submit() {
       />
     </div>
 
-    <div v-if="entryType === 'doubles'" class="form-field">
+    <div v-if="showMemberTwo" class="form-field">
       <label for="reg-member-two">{{ t('registrationForm.memberTwo') }}</label>
       <input
         id="reg-member-two"
@@ -109,6 +116,18 @@ async function submit() {
         autocomplete="name"
         :disabled="loading"
         required
+      />
+    </div>
+
+    <div v-if="showMemberTwoOptional" class="form-field">
+      <label for="reg-member-two">{{ t('registrationForm.memberTwoOptional') }}</label>
+      <input
+        id="reg-member-two"
+        v-model="form.memberTwo"
+        class="input"
+        type="text"
+        autocomplete="name"
+        :disabled="loading"
       />
     </div>
 
