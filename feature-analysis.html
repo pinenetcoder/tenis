@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tenis — Feature Analysis</title>
+<style>
+  :root {
+    --bg: #0b0f0c;
+    --bg-elev: #121814;
+    --bg-elev-2: #1a221d;
+    --border: #233028;
+    --border-strong: #2f3f35;
+    --text: #e8f0ea;
+    --text-dim: #8ea69a;
+    --text-mute: #5d7566;
+    --accent: #b4ff39;
+    --accent-dim: #7bc91b;
+    --accent-soft: rgba(180, 255, 57, 0.12);
+    --ok: #22d981;
+    --warn: #f5a623;
+    --err: #ff5a5f;
+    --info: #5ac8fa;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  }
+  [data-theme="light"] {
+    --bg: #f7f9f7;
+    --bg-elev: #ffffff;
+    --bg-elev-2: #f0f4f1;
+    --border: #dde5df;
+    --border-strong: #c4d1c8;
+    --text: #0e1a12;
+    --text-dim: #475a4e;
+    --text-mute: #7a8b7f;
+    --accent: #4b8b00;
+    --accent-dim: #3a6b00;
+    --accent-soft: rgba(75, 139, 0, 0.1);
+    --ok: #0a8a4a;
+    --warn: #c57c00;
+    --err: #c42d32;
+    --info: #0b78ad;
+    --shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.2s, color 0.2s;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Layout */
+  .app {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+  }
+
+  /* Sidebar */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    border-right: 1px solid var(--border);
+    background: var(--bg-elev);
+    padding: 24px 20px;
+    overflow-y: auto;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 28px;
+    letter-spacing: -0.01em;
+  }
+  .brand-ball {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 20px var(--accent-soft);
+    position: relative;
+  }
+  .brand-ball::before, .brand-ball::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--bg);
+  }
+  .brand-ball::before { transform: rotate(35deg) scaleY(0.55); }
+  .brand-ball::after { transform: rotate(-35deg) scaleY(0.55); }
+
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    color: var(--text-dim);
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    transition: all 0.15s;
+  }
+  .nav a:hover { background: var(--bg-elev-2); color: var(--text); text-decoration: none; }
+  .nav a.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .nav-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    opacity: 0.6;
+    min-width: 18px;
+  }
+
+  .sidebar-footer {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    gap: 8px;
+  }
+  .btn-icon {
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .btn-icon:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Main */
+  main {
+    max-width: 1080px;
+    width: 100%;
+    padding: 40px 48px 80px;
+  }
+  @media (max-width: 700px) { main { padding: 24px 20px 60px; } }
+
+  section { scroll-margin-top: 20px; margin-bottom: 64px; }
+
+  /* Hero */
+  .hero { margin-bottom: 56px; }
+  .hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .hero-kicker::before {
+    content: "";
+    display: block;
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+  }
+  h1 {
+    font-size: clamp(32px, 5vw, 52px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    font-weight: 800;
+  }
+  h1 .accent { color: var(--accent); }
+  .hero-sub {
+    font-size: 17px;
+    color: var(--text-dim);
+    max-width: 680px;
+    margin: 0 0 28px;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 32px;
+  }
+  .stat {
+    padding: 18px 20px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-value.ok { color: var(--ok); }
+  .stat-value.warn { color: var(--warn); }
+  .stat-value.err { color: var(--err); }
+  .stat-value.accent { color: var(--accent); }
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+  }
+
+  /* Headings */
+  h2 {
+    font-size: 26px;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    font-weight: 700;
+  }
+  h2 .section-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-mute);
+    font-weight: 500;
+  }
+  h3 {
+    font-size: 18px;
+    margin: 24px 0 12px;
+    font-weight: 600;
+  }
+  .section-sub {
+    color: var(--text-dim);
+    margin: 0 0 24px;
+    font-size: 14.5px;
+    max-width: 720px;
+  }
+
+  /* TL;DR */
+  .tldr {
+    background: linear-gradient(135deg, var(--bg-elev) 0%, var(--bg-elev-2) 100%);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+  }
+  .tldr ul { margin: 12px 0 0; padding-left: 20px; }
+  .tldr li { margin-bottom: 8px; color: var(--text-dim); }
+  .tldr li strong { color: var(--text); font-weight: 600; }
+  .top5 {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+    counter-reset: top5;
+  }
+  .top5 li {
+    counter-increment: top5;
+    position: relative;
+    padding: 10px 12px 10px 48px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+  }
+  .top5 li::before {
+    content: counter(top5);
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Filter bar */
+  .filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+    align-items: center;
+  }
+  .chip {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .chip:hover { border-color: var(--border-strong); color: var(--text); }
+  .chip.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .search {
+    flex: 1;
+    min-width: 200px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .search:focus { outline: none; border-color: var(--accent); }
+
+  /* Audit table */
+  .audit-table {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .audit-row {
+    display: grid;
+    grid-template-columns: 1fr 120px 2fr;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    font-size: 14px;
+  }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-row.hidden { display: none; }
+  @media (max-width: 700px) {
+    .audit-row { grid-template-columns: 1fr; gap: 4px; }
+  }
+  .audit-name { font-weight: 500; }
+  .audit-comment { color: var(--text-dim); font-size: 13px; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .badge::before {
+    content: "";
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .badge-ok {
+    background: rgba(34, 217, 129, 0.12);
+    color: var(--ok);
+  }
+  .badge-ok::before { background: var(--ok); }
+  .badge-partial {
+    background: rgba(245, 166, 35, 0.14);
+    color: var(--warn);
+  }
+  .badge-partial::before { background: var(--warn); }
+  .badge-missing {
+    background: rgba(255, 90, 95, 0.12);
+    color: var(--err);
+  }
+  .badge-missing::before { background: var(--err); }
+
+  /* P0 cards */
+  .p0-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .p0-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--err);
+    border-radius: var(--radius);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .p0-card:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+  .p0-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--err);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .p0-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    line-height: 1.3;
+  }
+  .p0-desc {
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .p0-details {
+    display: none;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .p0-card.expanded .p0-details { display: block; }
+  .p0-card.expanded { border-left-color: var(--accent); }
+
+  /* Format cards */
+  .formats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .format-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .format-card:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+  .format-card.hidden { display: none; }
+  .format-card.highlight { border-color: var(--accent); }
+  .format-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .format-name {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .format-name .star { color: var(--accent); margin-left: 4px; }
+  .format-when {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+  }
+  .format-detail {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.55;
+  }
+  .format-meta {
+    display: flex;
+    gap: 6px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-elev-2);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .pill-m { color: var(--warn); background: rgba(245, 166, 35, 0.1); }
+  .pill-l { color: var(--err); background: rgba(255, 90, 95, 0.1); }
+  .pill-new { color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+  .pill-exists { color: var(--text-mute); }
+
+  /* Features (new ideas) */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+  }
+  .feat-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    transition: all 0.15s;
+  }
+  .feat-card:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+  }
+  .feat-card.hidden { display: none; }
+  .feat-cat {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .feat-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    line-height: 1.35;
+  }
+  .feat-title .star { color: var(--accent); margin-left: 2px; }
+  .feat-desc {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* Roadmap */
+  .roadmap {
+    position: relative;
+    margin-top: 24px;
+  }
+  .phase {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .phase:last-child { border-bottom: none; }
+  .phase-time {
+    position: sticky;
+    top: 24px;
+    align-self: start;
+  }
+  .phase-label {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .phase-2 .phase-label { background: var(--info); }
+  .phase-3 .phase-label { background: var(--warn); }
+  .phase-later .phase-label { background: var(--text-mute); }
+  .phase-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 4px;
+    color: var(--text-dim);
+  }
+  .phase-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .phase-item {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phase-item::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .phase-2 .phase-item::before { background: var(--info); }
+  .phase-3 .phase-item::before { background: var(--warn); }
+  .phase-later .phase-item::before { background: var(--text-mute); }
+  .phase-later .phase-item { opacity: 0.7; text-decoration: line-through; text-decoration-color: var(--text-mute); }
+  @media (max-width: 700px) {
+    .phase { grid-template-columns: 1fr; }
+    .phase-time { position: static; }
+  }
+
+  /* Risks */
+  .risks { display: grid; gap: 10px; }
+  .risk {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    align-items: start;
+    gap: 14px;
+  }
+  .risk-icon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(245, 166, 35, 0.14);
+    color: var(--warn);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .risk-body { font-size: 13.5px; color: var(--text-dim); }
+  .risk-body strong { color: var(--text); font-weight: 600; }
+
+  /* Footer */
+  .docfooter {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-mute);
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* Utilities */
+  .muted { color: var(--text-mute); }
+  .mono { font-family: var(--mono); font-size: 0.92em; }
+  code {
+    font-family: var(--mono);
+    background: var(--bg-elev-2);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.88em;
+    color: var(--accent);
+  }
+
+  /* Mobile nav */
+  .mobile-nav {
+    display: none;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    z-index: 10;
+    font-weight: 600;
+  }
+  @media (max-width: 900px) {
+    .mobile-nav { display: flex; justify-content: space-between; align-items: center; }
+  }
+  .mobile-nav select {
+    background: var(--bg-elev);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-ball"></span>
+        Tenis · Analysis
+      </div>
+      <nav class="nav">
+        <a href="#tldr" class="active"><span class="nav-num">01</span>TL;DR</a>
+        <a href="#audit"><span class="nav-num">02</span>Аудит</a>
+        <a href="#p0"><span class="nav-num">03</span>P0-долг</a>
+        <a href="#formats"><span class="nav-num">04</span>Форматы</a>
+        <a href="#features"><span class="nav-num">05</span>Новые фичи</a>
+        <a href="#roadmap"><span class="nav-num">06</span>Roadmap</a>
+        <a href="#risks"><span class="nav-num">07</span>Риски</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="btn-icon" id="theme-toggle" title="Тема">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        </button>
+        <button class="btn-icon" id="print-btn" title="Печать">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <main>
+      <div class="mobile-nav">
+        <span>Tenis · Analysis</span>
+        <select id="mobile-jump" onchange="location.hash=this.value">
+          <option value="#tldr">01 · TL;DR</option>
+          <option value="#audit">02 · Аудит</option>
+          <option value="#p0">03 · P0-долг</option>
+          <option value="#formats">04 · Форматы</option>
+          <option value="#features">05 · Фичи</option>
+          <option value="#roadmap">06 · Roadmap</option>
+          <option value="#risks">07 · Риски</option>
+        </select>
+      </div>
+
+      <section class="hero">
+        <div class="hero-kicker">Feature analysis · 2026</div>
+        <h1>Турнирная платформа<br><span class="accent">без слабых мест.</span></h1>
+        <p class="hero-sub">Аудит реально реализованного, альтернативные форматы турниров и пересмотр приоритетов на 3–6 месяцев с учётом гибридной модели «клубы + индивидуальные организаторы».</p>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value ok" id="stat-ok">—</div>
+            <div class="stat-label">Работает</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value warn" id="stat-partial">—</div>
+            <div class="stat-label">Частично</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value err" id="stat-missing">—</div>
+            <div class="stat-label">Не реализовано</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value accent">9</div>
+            <div class="stat-label">Форматов сеток</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value accent">32</div>
+            <div class="stat-label">Новых идей</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tldr">
+        <h2><span class="section-num">01</span>TL;DR</h2>
+        <p class="section-sub">Короткая сводка: что работает, где критические пробелы и где должен быть фокус.</p>
+        <div class="tldr">
+          <p><strong>Ядро работает</strong> — создание турнира, публичная регистрация по slug, single-elimination, drag-drop, ввод счёта по сетам, роли owner/editor, 3 языка, dark theme, realtime.</p>
+          <p><strong>Но заявлено и не реализовано:</strong> live-scoring по очкам (нет <code>useTennisScoring.js</code> и <code>live_scores</code>), роль <code>counter</code>, профили игроков с историей, связь клуб ↔ турнир (<code>tournaments.club_id</code> не используется).</p>
+          <p><strong>Архитектурная дыра:</strong> нет сущности <code>players</code> — всё в <code>entry_members</code> строками. Без этого невозможны профили, ELO, история.</p>
+
+          <h3 style="margin-top:22px;margin-bottom:8px;">Топ-5 рекомендаций на 3–6 месяцев</h3>
+          <ol class="top5">
+            <li><strong>Закрыть P0-долг</strong> (секция 3) — иначе всё дальнейшее строится на песке.</li>
+            <li><strong>Публичная страница клуба</strong> <code>/clubs/:slug</code> и связать турниры с клубами.</li>
+            <li><strong>Round-robin + group stage + playoff</strong> — group stage отсутствует в FEATURE_RESEARCH, но самый востребованный в клубах.</li>
+            <li><strong>Категории участников</strong> (возраст / пол / уровень) + waiting list — ожидание любого серьёзного клуба.</li>
+            <li><strong>Telegram-бот</strong> — самая дешёвая killer-фича для RU / LT / EE рынка.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="audit">
+        <h2><span class="section-num">02</span>Аудит текущего состояния</h2>
+        <p class="section-sub">Что реально работает в коде, а что — декларативно в документации. Фильтруй по статусу.</p>
+
+        <div class="filterbar">
+          <button class="chip active" data-filter="all">Всё</button>
+          <button class="chip" data-filter="ok">Работает</button>
+          <button class="chip" data-filter="partial">Частично</button>
+          <button class="chip" data-filter="missing">Не реализовано</button>
+          <input class="search" id="audit-search" placeholder="Поиск по модулю...">
+        </div>
+
+        <div class="audit-table" id="audit-table"></div>
+      </section>
+
+      <section id="p0">
+        <h2><span class="section-num">03</span>P0 — технический долг</h2>
+        <p class="section-sub">Пункты, которые нужно закрыть <strong>до</strong> новых фич. Клик по карточке раскрывает детали.</p>
+
+        <div class="p0-grid" id="p0-grid"></div>
+      </section>
+
+      <section id="formats">
+        <h2><span class="section-num">04</span>Альтернативные форматы сеток</h2>
+        <p class="section-sub">Сейчас только <code>single_elimination</code>. Ниже — 9 форматов с оценкой сложности и B2B-ценности. <span style="color:var(--accent)">★</span> — клубная ценность.</p>
+
+        <div class="filterbar">
+          <button class="chip active" data-format="all">Все</button>
+          <button class="chip" data-format="new">Нет в FEATURE_RESEARCH</button>
+          <button class="chip" data-format="club">★ Клубная ценность</button>
+          <button class="chip" data-format="m">Сложность M</button>
+          <button class="chip" data-format="l">Сложность L</button>
+        </div>
+
+        <div class="formats-grid" id="formats-grid"></div>
+      </section>
+
+      <section id="features">
+        <h2><span class="section-num">05</span>Новые фичи</h2>
+        <p class="section-sub">Идеи, которых нет в FEATURE_RESEARCH.md. Фильтр по категории или поиск по словам.</p>
+
+        <div class="filterbar">
+          <button class="chip active" data-cat="all">Все</button>
+          <button class="chip" data-cat="club">Клубная витрина</button>
+          <button class="chip" data-cat="participants">Участники</button>
+          <button class="chip" data-cat="schedule">Расписание</button>
+          <button class="chip" data-cat="finance">Финансы</button>
+          <button class="chip" data-cat="marketing">Зрители / маркетинг</button>
+          <button class="chip" data-cat="ops">Операционка</button>
+          <button class="chip" data-cat="reliability">Надёжность</button>
+          <input class="search" id="feat-search" placeholder="Поиск по фичам...">
+        </div>
+
+        <div class="features-grid" id="features-grid"></div>
+      </section>
+
+      <section id="roadmap">
+        <h2><span class="section-num">06</span>Пересмотр приоритетов 3–6 месяцев</h2>
+        <p class="section-sub">Hybrid-модель «клубы + индивидуалы». Что делаем, что осознанно откладываем.</p>
+
+        <div class="roadmap" id="roadmap"></div>
+      </section>
+
+      <section id="risks">
+        <h2><span class="section-num">07</span>Риски и допущения</h2>
+        <p class="section-sub">Чем придётся заплатить за выбранное направление.</p>
+
+        <div class="risks" id="risks"></div>
+      </section>
+
+      <div class="docfooter">
+        <div>Источник: <a href="FEATURE_ANALYSIS.md">FEATURE_ANALYSIS.md</a> · Дополняет <a href="FEATURE_RESEARCH.md">FEATURE_RESEARCH.md</a> и <a href="PRODUCT.md">PRODUCT.md</a></div>
+        <div class="muted">Горизонт · 3–6 месяцев</div>
+      </div>
+    </main>
+  </div>
+
+<script>
+  // ==== Data ====
+  const auditRows = [
+    { name: "Создание турнира, slug, видимость", status: "ok", note: "create_tournament() в schema.sql" },
+    { name: "Single-elimination сетка", status: "ok", note: "generate_bracket(), rebuild_bracket()" },
+    { name: "Drag-drop расстановка", status: "ok", note: "swap_bracket_slots(), apply_bracket_layout()" },
+    { name: "Парный разряд (pre-agreed / pick-random)", status: "ok", note: "form_random_pairs(), form_manual_pairs(), split_pairs()" },
+    { name: "Модерация заявок", status: "ok", note: "entries.status, bulk approve" },
+    { name: "Ввод счёта по сетам", status: "ok", note: "update_match_sets() + автоопределение победителя" },
+    { name: "Realtime публикация", status: "ok", note: "supabase_realtime на 6 таблицах" },
+    { name: "i18n (ru / en / lt)", status: "ok", note: "messages.js, localStorage.champ_locale" },
+    { name: "Роли owner / editor", status: "ok", note: "tournament_admins, add_tournament_admin_by_email()" },
+    { name: "Публичная страница турнира", status: "ok", note: "PublicTournamentView.vue" },
+    { name: "Клуб — регистрация + модерация super-admin", status: "ok", note: "register_club(), approve_club(), reject_club()" },
+    { name: "Live-scoring (очки / геймы / деус / undo)", status: "missing", note: "Заявлен в PRODUCT.md:61 и CLAUDE.md, но useTennisScoring.js и live_scores таблицы НЕТ. Компоненты Modal есть без бэкенда." },
+    { name: "Роль counter (судья-счётчик)", status: "missing", note: "Декларирована, но в tournament_admins.role только owner/editor." },
+    { name: "Профили игроков с историей", status: "partial", note: "user_profiles только имя+телефон. Нет связи entry_members → игрок, нет W/L, нет истории." },
+    { name: "Связь клуб → турнир", status: "missing", note: "tournaments.club_id в схеме есть, но create_tournament() его не выставляет." },
+    { name: "Walkover / неявка", status: "missing", note: "В match_status только pending/ready/finished." },
+    { name: "Light theme", status: "missing", note: "Только dark. CSS-переменные есть, значений для light нет." },
+    { name: "Экспорт (CSV / PDF)", status: "missing", note: "—" },
+    { name: "Уведомления (email / push / мессенджеры)", status: "missing", note: "—" },
+    { name: "Расписание матчей (дата / время / корт)", status: "missing", note: "В matches нет scheduled_at, court_name." },
+  ];
+
+  const p0Items = [
+    {
+      n: "P0.1",
+      title: "Live-scoring: либо делаем, либо убираем из docs",
+      short: "Декларация расходится с кодом. Нужен композабл, таблица live_scores, RPC.",
+      details: "3 варианта: (1) реализовать useTennisScoring.js + live_scores + RPC start/stop/record_point, подключить к существующим модалкам (~3–5 дней); (2) убрать упоминания из PRODUCT.md/CLAUDE.md; (3) временно — ввод геймами без логики точек. Рекомендую вариант 1 — killer-фича уже полуготова.",
+    },
+    {
+      n: "P0.2",
+      title: "Связать клубы с турнирами",
+      short: "tournaments.club_id есть в схеме, но create_tournament() его не заполняет.",
+      details: "Добавить параметр p_club_id в create_tournament(). Если user — владелец клуба, турнир по умолчанию создаётся под этим клубом. Без этого /clubs/:slug витрины не будет.",
+    },
+    {
+      n: "P0.3",
+      title: "Players как first-class сущность",
+      short: "Сейчас имена — строки в entry_members. Без players нет ELO, профилей, истории.",
+      details: "Таблица players(id, contact_hash, display_name, merged_into). entry_members.player_id → players.id. Ключ склейки — нормализованный телефон/email. При register_entry() ищется существующий player. Админский merge-инструмент для дубликатов.",
+    },
+    {
+      n: "P0.4",
+      title: "Синхронизировать CLAUDE.md со схемой",
+      short: "CLAUDE.md обещает то, чего нет. Агент будет работать по ложным данным.",
+      details: "Убрать counter или добавить в БД. Убрать useTennisScoring.js, пока нет. Добавить clubs и platform_admins — их в CLAUDE.md нет вообще.",
+    },
+    {
+      n: "P0.5",
+      title: "Rate limiting публичной регистрации",
+      short: "register_entry() вызывается без авторизации. Spam-риск.",
+      details: "Бот может создать 10 000 заявок. Варианты: captcha на форме, rate limit по IP через Edge Function, SMS-код для телефона. Минимум — IP throttle.",
+    },
+  ];
+
+  const formats = [
+    { name: "Round-robin (группы)", star: false, when: "4–8 игроков, клубные вечера", comp: "M", isNew: false, detail: "Каждый играет с каждым. Победитель — по W/L, потом разница сетов/геймов. bracket_format='round_robin', таблица groups." },
+    { name: "Group stage + playoff", star: true, when: "16–32 игрока, формат ATP 250", comp: "L", isNew: true, detail: "4 группы по 4 → RR → top-2 из каждой → single-elim на 8. Сущность tournament_stages(id, tournament_id, order, format). Переход кнопкой «Завершить этап»." },
+    { name: "Double elimination", star: false, when: "Серьёзные турниры с losers bracket", comp: "L", isNew: false, detail: "Проигравший не вылетает, попадает в нижнюю сетку. Параллельная 'losers bracket' с автоперемещением. Сложная, но востребованная." },
+    { name: "Swiss system", star: false, when: "6–9 туров без вылета", comp: "M", isNew: true, detail: "Пары формируются по близости очков после каждого тура. Повторные пары запрещены. generate_swiss_round(t, round) учитывает матрицу 'кто с кем'." },
+    { name: "Consolation bracket", star: false, when: "Проигравший 1-й круг играет утешительный", comp: "M", isNew: true, detail: "Параллельная сетка для проигравших 1-го круга. Второй корень matches, UI-переключатель 'основная / утешительная'." },
+    { name: "Ladder / Box league", star: true, when: "Постоянная клубная лига с challenge-матчами", comp: "L", isNew: true, detail: "Игроки в «коробках» по 4–6. Каждую неделю 1–2 матча. Раз в месяц top-2 поднимается, bottom-2 опускается. То, ради чего клубы платят год." },
+    { name: "Compass draw", star: false, when: "Юниоры, все играют ≥3 матча", comp: "M", isNew: true, detail: "После 1-го круга проигравшие уходят в 'север/юг/запад/восток' — мини-сетки. Важно для детских турниров." },
+    { name: "Team format (клуб vs клуб)", star: true, when: "Межклубные турниры и лиги", comp: "L", isNew: true, detail: "Команда = N одиночных + M парных. Сущности teams, team_members, team_matches со ссылками на matches. Драйвер удержания клубов." },
+    { name: "Multi-stage template", star: false, when: "Комбинированные турниры", comp: "L", isNew: true, detail: "Этап 1 RR → этап 2 SE → финал best-of-5. Переиспользует сущности других форматов, нужна UI-оркестровка." },
+  ];
+
+  const features = [
+    { cat: "club", title: "Публичная страница клуба /clubs/:slug", star: true, desc: "Описание, контакты, календарь турниров, история. Главная монетизационная точка клуба." },
+    { cat: "club", title: "Членство в клубе (подписка/абонемент)", star: false, desc: "Приватные турниры только для членов, скидки. Таблица club_members(club_id, user_id, tier, expires_at)." },
+    { cat: "club", title: "Embed-виджет сетки", star: true, desc: "<iframe src='…/embed/:slug'> одной строкой. Клубам важно показывать сетку на своём сайте." },
+    { cat: "club", title: "Клубный рейтинг (клубный ELO)", star: false, desc: "ELO внутри клуба, независимо от глобального. Клубы гордятся внутренней иерархией." },
+    { cat: "club", title: "Тренер-вью", star: false, desc: "Тренер видит своих учеников, их результаты, рекомендует турниры. Роль coach в club_members." },
+    { cat: "club", title: "Галерея «Наши чемпионы»", star: false, desc: "Победители клубных турниров за историю." },
+    { cat: "participants", title: "Категории (возраст / пол / уровень)", star: true, desc: "U10/U12/U14/seniors 35+/45+. NTRP 2.5–4.5. В турнире может быть несколько категорий — 'группы регистрации'." },
+    { cat: "participants", title: "Посев по уровню", star: false, desc: "draw_mode='skill_seeded' — топ-4 по уровню в разные четверти сетки. Не только рандом/ручной." },
+    { cat: "participants", title: "Waiting list + auto-promote", star: true, desc: "Когда лимит исчерпан, заявки в очередь. При отказе — первый из очереди автоматически одобряется." },
+    { cat: "participants", title: "Частичная регистрация", star: false, desc: "Игрок бронирует место на 24 ч до оплаты. Не оплатил — слот возвращается." },
+    { cat: "participants", title: "Приватные турниры по invite-коду", star: false, desc: "Или email-allowlist. Для закрытых клубных и корпоративных." },
+    { cat: "participants", title: "Валидация возраста", star: false, desc: "Мин/макс возраст по дате рождения на сервере." },
+    { cat: "schedule", title: "Несколько кортов с покрытием", star: false, desc: "hard/clay/grass/indoor, почасовая цена. courts(club_id, name, surface, hourly_rate)." },
+    { cat: "schedule", title: "Блокировка слотов", star: false, desc: "Корт занят (аренда), погода, ремонт. Затемнённые ячейки в UI расписания." },
+    { cat: "schedule", title: "Автораспределение по кортам", star: true, desc: "auto_schedule_matches(t, constraints). Отдых ≥30 мин, равномерная нагрузка." },
+    { cat: "schedule", title: "ETA следующего матча", star: false, desc: "Push игроку: «на корт через 15 мин». Требует scheduled_at + состояние предыдущих матчей." },
+    { cat: "schedule", title: "Reschedule с уведомлением", star: false, desc: "Перенос матча пушит обеим сторонам, журнал истории переносов." },
+    { cat: "schedule", title: "Календарь клуба (ics / Google / Apple)", star: false, desc: "Все турниры клуба на месяц вперёд с экспортом." },
+    { cat: "finance", title: "Возврат при отмене", star: false, desc: "Полный/частичный refund при отмене турнира или за X часов до старта." },
+    { cat: "finance", title: "Split-оплата пар", star: false, desc: "Оба игрока пары платят по 50%. Подтверждение пары только после обоих платежей." },
+    { cat: "finance", title: "Промокоды и ранняя регистрация", star: false, desc: "EARLY_BIRD_20 до даты X. Стандарт для спортивных событий." },
+    { cat: "finance", title: "Дашборд выручки клуба", star: true, desc: "Турниры, участники, средний чек, повторные плательщики." },
+    { cat: "finance", title: "Invoice / чек на email", star: false, desc: "PDF с реквизитами клуба. Требование бухгалтерии корпоративов." },
+    { cat: "finance", title: "Локальные методы оплаты", star: false, desc: "Revolut, Paysera (LT), СБП (RU) — помимо Stripe." },
+    { cat: "marketing", title: "OG-теги для соцсетей", star: true, desc: "При шаринге ссылки превью показывает сетку, даты. Сейчас — голый заголовок." },
+    { cat: "marketing", title: "Highlights-лента клуба", star: false, desc: "«Вчера Иванов обыграл Петрова 6:4 6:3» автоматически из завершённых матчей." },
+    { cat: "marketing", title: "Фото-галерея турнира", star: false, desc: "Upload от организатора/игроков, GDPR-согласие при регистрации." },
+    { cat: "marketing", title: "OBS-оверлей со счётом", star: true, desc: "URL с чистым HTML-счётом для browser source OBS. Комментаторы и клубные стримы." },
+    { cat: "marketing", title: "Sponsors block", star: false, desc: "Логотипы спонсоров с ссылками на публичной странице. Монетизация для организатора." },
+    { cat: "marketing", title: "Чат на странице матча", star: false, desc: "Комментарии/сторис под матчем для вовлечения зрителей в live." },
+    { cat: "ops", title: "Template турнира", star: true, desc: "«Сохранить как шаблон» → duplicate. Для клубов, проводящих каждую субботу." },
+    { cat: "ops", title: "Массовые действия", star: false, desc: "Одобрить N заявок, отклонить из чёрного списка, rebroadcast в Telegram." },
+    { cat: "ops", title: "Audit log изменений", star: true, desc: "Кто и когда поменял счёт/сетку/статус. Критично для разрешения споров." },
+    { cat: "ops", title: "Draw ceremony mode", star: false, desc: "Полноэкранная анимация жеребьёвки. Для клубных вечеров." },
+    { cat: "ops", title: "Player-reported scores", star: true, desc: "Игроки подтверждают счёт через ссылку. Верификация от обеих сторон. Снимает нагрузку со счётчика." },
+    { cat: "ops", title: "Auto ban-list", star: false, desc: "2 неявки → игрок без автосогласования. Опционально на уровне клуба." },
+    { cat: "reliability", title: "2FA для super-admin", star: true, desc: "platform_admins сейчас только за OAuth. Один взлом Google — вся платформа под угрозой." },
+    { cat: "reliability", title: "Audit log super-admin", star: false, desc: "Одобрение/отклонение клубов — кто, когда, причина." },
+    { cat: "reliability", title: "Rate limiting публичной регистрации", star: true, desc: "Captcha / IP throttle / SMS-код. Сейчас любой бот → 10 000 заявок." },
+    { cat: "reliability", title: "Soft-delete с восстановлением", star: false, desc: "30 дней окно восстановления удалённого турнира. Защита от случайного клика." },
+    { cat: "reliability", title: "Backup / export данных клуба", star: false, desc: "«Скачать всё» — JSON + CSV + PDF. GDPR-дружественно, снимает барьер регистрации." },
+    { cat: "reliability", title: "Sentry для frontend-ошибок", star: false, desc: "Централизованный сбор. Сейчас ошибки невидимы." },
+  ];
+
+  const roadmap = [
+    {
+      phase: 1, label: "Месяц 1", title: "Фундамент — P0 + базовые ожидания",
+      items: ["P0-долг целиком", "Walkover", "Дата/место турнира", "Light theme", "CSV-экспорт", "Страница клуба /clubs/:slug"],
+    },
+    {
+      phase: 2, label: "Месяц 2–3", title: "Форматы и клубная ценность",
+      items: ["Round-robin", "Group stage + playoff", "Категории участников", "Waiting list", "Расписание + корты + ETA", "Telegram-бот", "Email-уведомления"],
+    },
+    {
+      phase: 3, label: "Месяц 4–6", title: "Удержание и монетизация",
+      items: ["Профили игроков + ELO", "Серии турниров (K4)", "Court Mode (K5)", "Stripe + entry fee", "Embed-виджет + OG-теги", "Ladder / Box league", "Template турнира"],
+    },
+    {
+      phase: "later", label: "Отложено", title: "Осознанно за горизонт",
+      items: ["Double elimination", "Swiss", "Compass draw", "Offline PWA", "Геймификация (K6)", "Bulk CSV импорт", "Smart seeding (K3)"],
+    },
+  ];
+
+  const risks = [
+    { body: "<strong>Гибридная модель удвоит сложность UI.</strong> Две навигации, две витрины, разные permissions. Нужно решение: одна страница турнира с блоком «Проводит клуб [X]» или две раздельные. Рекомендую — одна." },
+    { body: "<strong>Миграция на обязательный club_id.</strong> Legacy турниры без клуба — (а) оставить nullable; (б) создать 'virtual club' для каждого индивидуала." },
+    { body: "<strong>Stripe = compliance.</strong> KYC клубов, налоги по юрисдикциям (LT/RU/EE), возвраты по GDPR/PCI. Полный квартал, не неделя." },
+    { body: "<strong>ELO без истории = мусор.</strong> Первые 5–10 матчей рейтинг неинформативен. Нужен period 'provisional' с флагом в UI." },
+    { body: "<strong>Telegram-бот требует модерации.</strong> Spam от ботов к организаторам — реален. Rate limiting и блок-лист обязательны." },
+    { body: "<strong>Live-scoring и offline несовместимы</strong> в MVP. Сначала стабильный online, потом Service Worker." },
+  ];
+
+  // ==== Render ====
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
+
+  // Stats
+  const okCount = auditRows.filter(r => r.status === "ok").length;
+  const partialCount = auditRows.filter(r => r.status === "partial").length;
+  const missingCount = auditRows.filter(r => r.status === "missing").length;
+  $("#stat-ok").textContent = okCount;
+  $("#stat-partial").textContent = partialCount;
+  $("#stat-missing").textContent = missingCount;
+
+  // Audit
+  const auditTable = $("#audit-table");
+  auditTable.innerHTML = auditRows.map(r => `
+    <div class="audit-row" data-status="${r.status}">
+      <div class="audit-name">${r.name}</div>
+      <div><span class="badge badge-${r.status === 'ok' ? 'ok' : r.status === 'partial' ? 'partial' : 'missing'}">
+        ${r.status === 'ok' ? 'Работает' : r.status === 'partial' ? 'Частично' : 'Нет'}
+      </span></div>
+      <div class="audit-comment">${r.note}</div>
+    </div>
+  `).join("");
+
+  function filterAudit() {
+    const active = $(".filterbar [data-filter].active")?.dataset.filter || "all";
+    const q = $("#audit-search").value.toLowerCase();
+    $$(".audit-row").forEach(row => {
+      const matchStatus = active === "all" || row.dataset.status === active;
+      const text = row.textContent.toLowerCase();
+      const matchText = !q || text.includes(q);
+      row.classList.toggle("hidden", !(matchStatus && matchText));
+    });
+  }
+  $$(".filterbar [data-filter]").forEach(chip => {
+    chip.addEventListener("click", () => {
+      $$(".filterbar [data-filter]").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      filterAudit();
+    });
+  });
+  $("#audit-search").addEventListener("input", filterAudit);
+
+  // P0
+  $("#p0-grid").innerHTML = p0Items.map(p => `
+    <div class="p0-card" onclick="this.classList.toggle('expanded')">
+      <div class="p0-num">${p.n}</div>
+      <div class="p0-title">${p.title}</div>
+      <div class="p0-desc">${p.short}</div>
+      <div class="p0-details">${p.details}</div>
+    </div>
+  `).join("");
+
+  // Formats
+  $("#formats-grid").innerHTML = formats.map(f => `
+    <div class="format-card ${f.star ? 'highlight' : ''}"
+         data-new="${f.isNew}" data-club="${f.star}" data-comp="${f.comp.toLowerCase()}">
+      <div class="format-header">
+        <div class="format-name">${f.name}${f.star ? '<span class="star">★</span>' : ''}</div>
+      </div>
+      <div class="format-when">${f.when}</div>
+      <div class="format-detail">${f.detail}</div>
+      <div class="format-meta">
+        <span class="pill pill-${f.comp.toLowerCase()}">Сложность ${f.comp}</span>
+        <span class="pill ${f.isNew ? 'pill-new' : 'pill-exists'}">${f.isNew ? 'NEW · нет в FEATURE_RESEARCH' : 'Уже в FEATURE_RESEARCH'}</span>
+      </div>
+    </div>
+  `).join("");
+
+  $$(".filterbar [data-format]").forEach(chip => {
+    chip.addEventListener("click", () => {
+      $$(".filterbar [data-format]").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      const v = chip.dataset.format;
+      $$(".format-card").forEach(card => {
+        let show = true;
+        if (v === "new") show = card.dataset.new === "true";
+        else if (v === "club") show = card.dataset.club === "true";
+        else if (v === "m") show = card.dataset.comp === "m";
+        else if (v === "l") show = card.dataset.comp === "l";
+        card.classList.toggle("hidden", !show);
+      });
+    });
+  });
+
+  // Features
+  const catLabels = {
+    club: "Клубная витрина",
+    participants: "Участники",
+    schedule: "Расписание",
+    finance: "Финансы",
+    marketing: "Маркетинг",
+    ops: "Операционка",
+    reliability: "Надёжность",
+  };
+  $("#features-grid").innerHTML = features.map(f => `
+    <div class="feat-card" data-cat="${f.cat}">
+      <div class="feat-cat">${catLabels[f.cat]}</div>
+      <div class="feat-title">${f.title}${f.star ? '<span class="star">★</span>' : ''}</div>
+      <div class="feat-desc">${f.desc}</div>
+    </div>
+  `).join("");
+
+  function filterFeatures() {
+    const active = $(".filterbar [data-cat].active")?.dataset.cat || "all";
+    const q = $("#feat-search").value.toLowerCase();
+    $$(".feat-card").forEach(card => {
+      const matchCat = active === "all" || card.dataset.cat === active;
+      const matchText = !q || card.textContent.toLowerCase().includes(q);
+      card.classList.toggle("hidden", !(matchCat && matchText));
+    });
+  }
+  $$(".filterbar [data-cat]").forEach(chip => {
+    chip.addEventListener("click", () => {
+      $$(".filterbar [data-cat]").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      filterFeatures();
+    });
+  });
+  $("#feat-search").addEventListener("input", filterFeatures);
+
+  // Roadmap
+  $("#roadmap").innerHTML = roadmap.map(ph => `
+    <div class="phase phase-${ph.phase}">
+      <div class="phase-time">
+        <div class="phase-label">${ph.label}</div>
+        <div class="phase-title">${ph.title}</div>
+      </div>
+      <div class="phase-items">
+        ${ph.items.map(i => `<div class="phase-item">${i}</div>`).join("")}
+      </div>
+    </div>
+  `).join("");
+
+  // Risks
+  $("#risks").innerHTML = risks.map((r, i) => `
+    <div class="risk">
+      <div class="risk-icon">!</div>
+      <div class="risk-body">${r.body}</div>
+    </div>
+  `).join("");
+
+  // Theme toggle
+  $("#theme-toggle").addEventListener("click", () => {
+    const cur = document.documentElement.dataset.theme;
+    document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+  });
+
+  // Print
+  $("#print-btn").addEventListener("click", () => window.print());
+
+  // Scroll spy for sidebar nav
+  const sections = $$("section[id]");
+  const navLinks = $$(".nav a");
+  const spy = () => {
+    let cur = "tldr";
+    const y = window.scrollY + 100;
+    sections.forEach(s => {
+      if (s.offsetTop <= y) cur = s.id;
+    });
+    navLinks.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + cur));
+  };
+  window.addEventListener("scroll", spy);
+  spy();
+</script>
+</body>
+</html>
