@@ -1576,3 +1576,319 @@ begin
     alter publication supabase_realtime add table tournament_admins;
   end if;
 end $$;
+
+-- =============================================
+-- CLUB REGISTRATION & PLATFORM ADMIN
+-- =============================================
+
+-- Enum: club status
+do $$ begin
+  create type club_status as enum ('pending', 'approved', 'rejected', 'active');
+exception
+  when duplicate_object then null;
+end $$;
+
+-- User profiles (extends auth.users)
+create table if not exists user_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  first_name text not null,
+  last_name text not null,
+  phone text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_user_profiles_updated_at on user_profiles;
+create trigger trg_user_profiles_updated_at
+before update on user_profiles for each row execute function set_updated_at();
+
+-- Clubs
+create table if not exists clubs (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  city text not null,
+  address text,
+  contact_email text,
+  contact_phone text,
+  status club_status not null default 'pending',
+  owner_id uuid not null references auth.users(id) on delete restrict,
+  rejection_reason text,
+  reviewed_by uuid references auth.users(id),
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_clubs_updated_at on clubs;
+create trigger trg_clubs_updated_at
+before update on clubs for each row execute function set_updated_at();
+
+-- Platform super admins
+create table if not exists platform_admins (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade unique,
+  created_at timestamptz not null default now()
+);
+
+-- Add nullable club_id to tournaments
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'tournaments' and column_name = 'club_id'
+  ) then
+    alter table tournaments add column club_id uuid references clubs(id) on delete set null;
+  end if;
+end $$;
+
+create index if not exists idx_tournaments_club on tournaments(club_id);
+
+-- Helper: check if current user is platform admin
+create or replace function is_platform_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from platform_admins where user_id = auth.uid()
+  );
+$$;
+
+-- RLS: user_profiles
+alter table user_profiles enable row level security;
+
+do $$ begin
+  drop policy if exists user_profiles_select_own on user_profiles;
+  drop policy if exists user_profiles_insert_own on user_profiles;
+  drop policy if exists user_profiles_update_own on user_profiles;
+  drop policy if exists user_profiles_select_superadmin on user_profiles;
+end $$;
+
+create policy user_profiles_select_own on user_profiles
+  for select to authenticated using (id = auth.uid());
+
+create policy user_profiles_insert_own on user_profiles
+  for insert to authenticated with check (id = auth.uid());
+
+create policy user_profiles_update_own on user_profiles
+  for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+
+create policy user_profiles_select_superadmin on user_profiles
+  for select to authenticated using (is_platform_admin());
+
+-- RLS: clubs
+alter table clubs enable row level security;
+
+do $$ begin
+  drop policy if exists clubs_select_own on clubs;
+  drop policy if exists clubs_select_superadmin on clubs;
+  drop policy if exists clubs_insert_authenticated on clubs;
+  drop policy if exists clubs_update_superadmin on clubs;
+end $$;
+
+create policy clubs_select_own on clubs
+  for select to authenticated using (owner_id = auth.uid());
+
+create policy clubs_select_superadmin on clubs
+  for select to authenticated using (is_platform_admin());
+
+create policy clubs_insert_authenticated on clubs
+  for insert to authenticated with check (owner_id = auth.uid());
+
+create policy clubs_update_superadmin on clubs
+  for update to authenticated using (is_platform_admin());
+
+-- RLS: platform_admins
+alter table platform_admins enable row level security;
+
+do $$ begin
+  drop policy if exists platform_admins_select_self on platform_admins;
+end $$;
+
+create policy platform_admins_select_self on platform_admins
+  for select to authenticated using (user_id = auth.uid());
+
+-- RPC: register club (profile + club in one transaction)
+create or replace function register_club(
+  p_first_name text,
+  p_last_name text,
+  p_phone text,
+  p_club_name text,
+  p_club_city text,
+  p_club_address text default null,
+  p_contact_email text default null,
+  p_contact_phone text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_club_id uuid;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required';
+  end if;
+
+  -- Upsert user profile
+  insert into user_profiles (id, first_name, last_name, phone)
+  values (v_uid, p_first_name, p_last_name, p_phone)
+  on conflict (id) do update
+  set first_name = excluded.first_name,
+      last_name = excluded.last_name,
+      phone = excluded.phone;
+
+  -- Check for duplicate club name in same city
+  if exists (
+    select 1 from clubs
+    where lower(name) = lower(p_club_name)
+      and lower(city) = lower(p_club_city)
+      and status in ('pending', 'approved', 'active')
+  ) then
+    raise exception 'CLUB_DUPLICATE';
+  end if;
+
+  -- Check if user already owns a pending/active club
+  if exists (
+    select 1 from clubs
+    where owner_id = v_uid
+      and status in ('pending', 'active')
+  ) then
+    raise exception 'CLUB_ALREADY_EXISTS';
+  end if;
+
+  insert into clubs (name, city, address, contact_email, contact_phone, owner_id, status)
+  values (
+    p_club_name, p_club_city, p_club_address,
+    coalesce(p_contact_email, (select email from auth.users where id = v_uid)),
+    p_contact_phone, v_uid, 'pending'
+  )
+  returning id into v_club_id;
+
+  return v_club_id;
+end;
+$$;
+
+-- RPC: approve club (super admin only)
+create or replace function approve_club(p_club_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not is_platform_admin() then
+    raise exception 'Not allowed';
+  end if;
+
+  update clubs
+  set status = 'active',
+      reviewed_by = auth.uid(),
+      reviewed_at = now(),
+      rejection_reason = null
+  where id = p_club_id and status = 'pending';
+end;
+$$;
+
+-- RPC: reject club (super admin only)
+create or replace function reject_club(p_club_id uuid, p_reason text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not is_platform_admin() then
+    raise exception 'Not allowed';
+  end if;
+
+  update clubs
+  set status = 'rejected',
+      reviewed_by = auth.uid(),
+      reviewed_at = now(),
+      rejection_reason = p_reason
+  where id = p_club_id and status = 'pending';
+end;
+$$;
+
+-- RPC: get pending clubs with owner info (super admin only)
+create or replace function get_pending_clubs()
+returns table (
+  id uuid,
+  name text,
+  city text,
+  address text,
+  contact_email text,
+  contact_phone text,
+  status club_status,
+  rejection_reason text,
+  created_at timestamptz,
+  reviewed_at timestamptz,
+  owner_first_name text,
+  owner_last_name text,
+  owner_email text,
+  owner_phone text,
+  duplicate_count bigint
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not is_platform_admin() then
+    raise exception 'Not allowed';
+  end if;
+
+  return query
+  select
+    c.id,
+    c.name,
+    c.city,
+    c.address,
+    c.contact_email,
+    c.contact_phone,
+    c.status,
+    c.rejection_reason,
+    c.created_at,
+    c.reviewed_at,
+    up.first_name::text as owner_first_name,
+    up.last_name::text as owner_last_name,
+    u.email::text as owner_email,
+    up.phone::text as owner_phone,
+    (
+      select count(*) from clubs c2
+      where lower(c2.name) = lower(c.name)
+        and lower(c2.city) = lower(c.city)
+        and c2.id != c.id
+        and c2.status in ('active', 'pending')
+    ) as duplicate_count
+  from clubs c
+  join auth.users u on u.id = c.owner_id
+  left join user_profiles up on up.id = c.owner_id
+  order by
+    case c.status when 'pending' then 0 when 'active' then 1 when 'rejected' then 2 else 3 end,
+    c.created_at desc;
+end;
+$$;
+
+-- Grant execute on new functions
+grant execute on function register_club(text, text, text, text, text, text, text, text) to authenticated;
+grant execute on function approve_club(uuid) to authenticated;
+grant execute on function reject_club(uuid, text) to authenticated;
+grant execute on function get_pending_clubs() to authenticated;
+grant execute on function is_platform_admin() to authenticated;
+
+-- Realtime for clubs
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'clubs'
+  ) then
+    alter publication supabase_realtime add table clubs;
+  end if;
+end $$;

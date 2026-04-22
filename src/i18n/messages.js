@@ -4,6 +4,75 @@ export const messages = {
       title: 'Теннис — чемпионаты',
       subtitle: 'Организация турниров, жеребьёвка и live-сетка',
     },
+    home: {
+      description: 'Платформа для организации теннисных турниров с жеребьёвкой, live-счётом и публичными ссылками для зрителей',
+      admin: {
+        title: 'Организатор',
+        description: 'Создавайте турниры, управляйте сеткой, ведите live-счёт и приглашайте со-организаторов',
+        button: 'Войти как организатор',
+      },
+      player: {
+        title: 'Игрок',
+        description: 'Регистрируйтесь на турниры, отслеживайте результаты и управляйте своим профилем',
+        button: 'Войти как игрок',
+      },
+      hero: {
+        badge: 'Платформа для теннисных турниров',
+        title: 'Проведите турнир',
+        titleAccent: 'на высшем уровне',
+        subtitle: 'От регистрации до финального мяча — всё в одном месте. Автоматическая сетка, live-счёт, публичная трансляция результатов.',
+        cta: 'Начать бесплатно',
+        ctaSecondary: 'Как это работает',
+      },
+      features: {
+        title: 'Всё что нужно организатору',
+        subtitle: 'Мощные инструменты для проведения турнира любого масштаба',
+        bracket: {
+          title: 'Автоматическая сетка',
+          description: 'Генерация олимпийской сетки в один клик. Рассеивание, ручная перестановка, визуализация на интерактивном полотне.',
+        },
+        liveScore: {
+          title: 'Live-счёт',
+          description: 'Поочковый ввод счёта в реальном времени. Авто-подсчёт геймов, сетов, тай-брейков. Отмена последнего действия.',
+        },
+        spectator: {
+          title: 'Зрительский доступ',
+          description: 'Публичная ссылка для зрителей. Онлайн-сетка и live-табло без регистрации и авторизации.',
+        },
+        doubles: {
+          title: 'Одиночный и парный',
+          description: 'Полная поддержка одиночных и парных разрядов. Случайная или ручная жеребьёвка пар.',
+        },
+        registration: {
+          title: 'Регистрация участников',
+          description: 'Открытая форма регистрации. Подтверждение заявок, управление посевом, экспорт списка.',
+        },
+        collaboration: {
+          title: 'Командная работа',
+          description: 'Приглашайте со-организаторов и судей. Гибкие роли: владелец, редактор, счётчик.',
+        },
+      },
+      howItWorks: {
+        title: 'Три шага до турнира',
+        subtitle: 'Запустите свой турнир за несколько минут',
+        step1: {
+          title: 'Создайте турнир',
+          description: 'Укажите название, формат и откройте регистрацию. Поделитесь публичной ссылкой.',
+        },
+        step2: {
+          title: 'Сформируйте сетку',
+          description: 'Подтвердите участников, расставьте сеяных — сетка сгенерируется автоматически.',
+        },
+        step3: {
+          title: 'Ведите матчи',
+          description: 'Вводите счёт в реальном времени. Победитель автоматически проходит в следующий раунд.',
+        },
+      },
+      cta: {
+        title: 'Готовы провести турнир?',
+        subtitle: 'Присоединяйтесь бесплатно и создайте свой первый турнир прямо сейчас.',
+      },
+    },
     login: {
       subtitle: 'Войдите, чтобы создавать турниры и делиться ссылкой со зрителями',
     },
@@ -197,11 +266,164 @@ export const messages = {
       notFound: 'Турнир не найден',
       checkLink: 'Проверьте правильность ссылки или обратитесь к организатору турнира.',
     },
+    clubRegistration: {
+      title: 'Регистрация клуба',
+      subtitle: 'Зарегистрируйте свой теннисный клуб и начните проводить турниры',
+      withGoogle: 'Продолжить с Google',
+      withEmail: 'Зарегистрироваться по email',
+      or: 'или',
+      back: 'Назад',
+      continue: 'Продолжить',
+      submit: 'Отправить заявку',
+      goToAdmin: 'Перейти к управлению',
+      registerNow: 'Зарегистрировать клуб',
+      noClub: 'У вас пока нет зарегистрированного клуба',
+      sections: {
+        personal: 'Личные данные',
+        club: 'Данные клуба',
+      },
+      fields: {
+        email: 'Email',
+        password: 'Пароль',
+        passwordHint: 'Минимум 6 символов',
+        firstName: 'Имя',
+        lastName: 'Фамилия',
+        phone: 'Телефон',
+        clubName: 'Название клуба',
+        clubCity: 'Город',
+        clubAddress: 'Адрес (улица, дом)',
+      },
+      errors: {
+        duplicate: 'Клуб с таким названием уже зарегистрирован в этом городе',
+        alreadyExists: 'У вас уже есть зарегистрированный клуб',
+      },
+      status: {
+        pending: {
+          title: 'Заявка на рассмотрении',
+          description: 'Ваша заявка отправлена и ожидает проверки администратором. Мы уведомим вас после рассмотрения.',
+        },
+        active: {
+          title: 'Клуб активен',
+          description: 'Ваш клуб одобрен. Теперь вы можете создавать турниры.',
+        },
+        rejected: {
+          title: 'Заявка отклонена',
+          description: 'К сожалению, ваша заявка была отклонена. Смотрите причину ниже.',
+        },
+        approved: {
+          title: 'Клуб одобрен',
+          description: 'Ваш клуб одобрен. Теперь вы можете создавать турниры.',
+        },
+      },
+    },
+    superAdmin: {
+      login: {
+        title: 'Суперадмин',
+        subtitle: 'Вход в панель управления платформой',
+        withGoogle: 'Войти через Google',
+        logout: 'Выйти',
+        notAuthorized: 'У этого аккаунта нет прав суперадминистратора',
+      },
+      brand: 'Панель администратора',
+      title: 'Модерация клубов',
+      subtitle: 'Рассмотрение заявок на регистрацию теннисных клубов',
+      filter: {
+        pending: 'На рассмотрении',
+        active: 'Активные',
+        rejected: 'Отклонённые',
+        all: 'Все',
+      },
+      status: {
+        pending: 'На рассмотрении',
+        active: 'Активен',
+        rejected: 'Отклонён',
+      },
+      empty: 'Нет заявок в этой категории',
+      owner: 'Владелец',
+      submittedAt: 'Подано',
+      contactPhone: 'Контактный телефон',
+      duplicateWarning: 'Возможный дубликат: найдено {count} совпадений по названию и городу',
+      approve: 'Одобрить',
+      reject: 'Отклонить',
+      confirmReject: 'Подтвердить отклонение',
+      cancel: 'Отмена',
+      rejectReasonPlaceholder: 'Причина отклонения (необязательно)',
+      rejectionReason: 'Причина отклонения',
+    },
   },
   en: {
     app: {
       title: 'Tennis Championships',
       subtitle: 'Run tournaments, draws, and live brackets',
+    },
+    home: {
+      description: 'Platform for organizing tennis tournaments with draws, live scoring, and public spectator links',
+      admin: {
+        title: 'Organizer',
+        description: 'Create tournaments, manage brackets, run live scoring, and invite co-organizers',
+        button: 'Sign in as organizer',
+      },
+      player: {
+        title: 'Player',
+        description: 'Register for tournaments, track results, and manage your profile',
+        button: 'Sign in as player',
+      },
+      hero: {
+        badge: 'Tennis tournament platform',
+        title: 'Run your tournament',
+        titleAccent: 'like a pro',
+        subtitle: 'From registration to match point — all in one place. Auto-generated brackets, live scoring, public result streaming.',
+        cta: 'Get started free',
+        ctaSecondary: 'See how it works',
+      },
+      features: {
+        title: 'Everything an organizer needs',
+        subtitle: 'Powerful tools to run a tournament of any scale',
+        bracket: {
+          title: 'Auto brackets',
+          description: 'Generate single-elimination brackets in one click. Seeding, manual rearrangement, interactive canvas visualization.',
+        },
+        liveScore: {
+          title: 'Live scoring',
+          description: 'Point-by-point score entry in real time. Auto calculation of games, sets, tiebreaks. Undo last action.',
+        },
+        spectator: {
+          title: 'Spectator access',
+          description: 'Public link for viewers. Live bracket and scoreboard — no sign-up required.',
+        },
+        doubles: {
+          title: 'Singles & doubles',
+          description: 'Full support for singles and doubles categories. Random or manual pair formation.',
+        },
+        registration: {
+          title: 'Player registration',
+          description: 'Open registration form. Approve entries, manage seeding, export the list.',
+        },
+        collaboration: {
+          title: 'Team collaboration',
+          description: 'Invite co-organizers and referees. Flexible roles: owner, editor, scorer.',
+        },
+      },
+      howItWorks: {
+        title: 'Three steps to your tournament',
+        subtitle: 'Launch your tournament in minutes',
+        step1: {
+          title: 'Create a tournament',
+          description: 'Set a name, format and open registration. Share the public link.',
+        },
+        step2: {
+          title: 'Build the bracket',
+          description: 'Approve entries, assign seeds — the bracket generates automatically.',
+        },
+        step3: {
+          title: 'Run the matches',
+          description: 'Enter scores in real time. Winners advance to the next round automatically.',
+        },
+      },
+      cta: {
+        title: 'Ready to run your tournament?',
+        subtitle: 'Join for free and create your first tournament right now.',
+      },
     },
     login: {
       subtitle: 'Sign in to create tournaments and share the public link with spectators',
@@ -396,11 +618,164 @@ export const messages = {
       notFound: 'Tournament not found',
       checkLink: 'Please check the link or contact the tournament organizer.',
     },
+    clubRegistration: {
+      title: 'Club registration',
+      subtitle: 'Register your tennis club and start running tournaments',
+      withGoogle: 'Continue with Google',
+      withEmail: 'Register with email',
+      or: 'or',
+      back: 'Back',
+      continue: 'Continue',
+      submit: 'Submit application',
+      goToAdmin: 'Go to dashboard',
+      registerNow: 'Register a club',
+      noClub: 'You don\'t have a registered club yet',
+      sections: {
+        personal: 'Personal details',
+        club: 'Club details',
+      },
+      fields: {
+        email: 'Email',
+        password: 'Password',
+        passwordHint: 'At least 6 characters',
+        firstName: 'First name',
+        lastName: 'Last name',
+        phone: 'Phone',
+        clubName: 'Club name',
+        clubCity: 'City',
+        clubAddress: 'Address (street, building)',
+      },
+      errors: {
+        duplicate: 'A club with this name is already registered in this city',
+        alreadyExists: 'You already have a registered club',
+      },
+      status: {
+        pending: {
+          title: 'Application under review',
+          description: 'Your application has been submitted and is awaiting admin review. We\'ll notify you once it\'s processed.',
+        },
+        active: {
+          title: 'Club is active',
+          description: 'Your club has been approved. You can now create tournaments.',
+        },
+        rejected: {
+          title: 'Application rejected',
+          description: 'Unfortunately, your application was rejected. See the reason below.',
+        },
+        approved: {
+          title: 'Club approved',
+          description: 'Your club has been approved. You can now create tournaments.',
+        },
+      },
+    },
+    superAdmin: {
+      login: {
+        title: 'Super Admin',
+        subtitle: 'Sign in to the platform management panel',
+        withGoogle: 'Sign in with Google',
+        logout: 'Sign out',
+        notAuthorized: 'This account does not have super admin privileges',
+      },
+      brand: 'Admin panel',
+      title: 'Club moderation',
+      subtitle: 'Review tennis club registration applications',
+      filter: {
+        pending: 'Pending',
+        active: 'Active',
+        rejected: 'Rejected',
+        all: 'All',
+      },
+      status: {
+        pending: 'Pending',
+        active: 'Active',
+        rejected: 'Rejected',
+      },
+      empty: 'No applications in this category',
+      owner: 'Owner',
+      submittedAt: 'Submitted',
+      contactPhone: 'Contact phone',
+      duplicateWarning: 'Possible duplicate: {count} match(es) found by name and city',
+      approve: 'Approve',
+      reject: 'Reject',
+      confirmReject: 'Confirm rejection',
+      cancel: 'Cancel',
+      rejectReasonPlaceholder: 'Rejection reason (optional)',
+      rejectionReason: 'Rejection reason',
+    },
   },
   lt: {
     app: {
       title: 'Teniso čempionatai',
       subtitle: 'Turnyrai, burtai ir gyvas tinklelis',
+    },
+    home: {
+      description: 'Platforma teniso turnyrų organizavimui su burtais, tiesioginiu rezultatų sekimu ir viešomis nuorodomis žiūrovams',
+      admin: {
+        title: 'Organizatorius',
+        description: 'Kurkite turnyrus, valdykite tinklelį, veskite tiesioginį rezultatą ir kvieskite bendraorganizatorius',
+        button: 'Prisijungti kaip organizatorius',
+      },
+      player: {
+        title: 'Žaidėjas',
+        description: 'Registruokitės į turnyrus, sekite rezultatus ir tvarkykite savo profilį',
+        button: 'Prisijungti kaip žaidėjas',
+      },
+      hero: {
+        badge: 'Teniso turnyrų platforma',
+        title: 'Organizuokite turnyrą',
+        titleAccent: 'profesionaliai',
+        subtitle: 'Nuo registracijos iki paskutinio taško — viskas vienoje vietoje. Automatiniai tinkleliai, tiesioginis rezultatas, viešas rezultatų transliavimas.',
+        cta: 'Pradėti nemokamai',
+        ctaSecondary: 'Kaip tai veikia',
+      },
+      features: {
+        title: 'Viskas, ko reikia organizatoriui',
+        subtitle: 'Galingi įrankiai bet kokio masto turnyrui',
+        bracket: {
+          title: 'Automatiniai tinkleliai',
+          description: 'Sugeneruokite olimpinį tinklelį vienu paspaudimu. Reitingavimas, rankinis pertvarkymas, interaktyvi vizualizacija.',
+        },
+        liveScore: {
+          title: 'Tiesioginis rezultatas',
+          description: 'Taškas po taško realiuoju laiku. Automatinis žaidimų, setų, pratęsimų skaičiavimas. Paskutinio veiksmo atšaukimas.',
+        },
+        spectator: {
+          title: 'Prieiga žiūrovams',
+          description: 'Vieša nuoroda žiūrovams. Tiesioginė turnyro lentelė ir rezultatai — be registracijos.',
+        },
+        doubles: {
+          title: 'Vienetai ir dvejetai',
+          description: 'Pilnas vienetų ir dvejetų kategorijų palaikymas. Atsitiktinis arba rankinis porų formavimas.',
+        },
+        registration: {
+          title: 'Žaidėjų registracija',
+          description: 'Atvira registracijos forma. Patvirtinkite dalyvius, tvarkykite reitingus, eksportuokite sąrašą.',
+        },
+        collaboration: {
+          title: 'Komandinis darbas',
+          description: 'Pakvieskite bendraorganizatorius ir teisėjus. Lankstūs vaidmenys: savininkas, redaktorius, skaičiuotojas.',
+        },
+      },
+      howItWorks: {
+        title: 'Trys žingsniai iki turnyro',
+        subtitle: 'Paleiskite savo turnyrą per kelias minutes',
+        step1: {
+          title: 'Sukurkite turnyrą',
+          description: 'Nurodykite pavadinimą, formatą ir atidarykite registraciją. Pasidalinkite vieša nuoroda.',
+        },
+        step2: {
+          title: 'Suformuokite tinklelį',
+          description: 'Patvirtinkite dalyvius, priskirkite reitingus — tinklelis sugeneruojamas automatiškai.',
+        },
+        step3: {
+          title: 'Veskite varžybas',
+          description: 'Įveskite rezultatą realiuoju laiku. Nugalėtojai automatiškai pereina į kitą ratą.',
+        },
+      },
+      cta: {
+        title: 'Pasiruošę organizuoti turnyrą?',
+        subtitle: 'Prisijunkite nemokamai ir sukurkite savo pirmąjį turnyrą jau dabar.',
+      },
     },
     login: {
       subtitle: 'Prisijunkite, kad kurtumėte turnyrus ir dalintumėtės vieša nuoroda su žiūrovais',
@@ -594,6 +969,90 @@ export const messages = {
       noAccess: 'Nėra prieigos prie šio turnyro',
       notFound: 'Turnyras nerastas',
       checkLink: 'Patikrinkite nuorodą arba susisiekite su turnyro organizatoriumi.',
+    },
+    clubRegistration: {
+      title: 'Klubo registracija',
+      subtitle: 'Užregistruokite savo teniso klubą ir pradėkite organizuoti turnyrus',
+      withGoogle: 'Tęsti su Google',
+      withEmail: 'Registruotis el. paštu',
+      or: 'arba',
+      back: 'Atgal',
+      continue: 'Tęsti',
+      submit: 'Pateikti paraišką',
+      goToAdmin: 'Eiti į valdymo skydelį',
+      registerNow: 'Registruoti klubą',
+      noClub: 'Jūs dar neturite registruoto klubo',
+      sections: {
+        personal: 'Asmeniniai duomenys',
+        club: 'Klubo duomenys',
+      },
+      fields: {
+        email: 'El. paštas',
+        password: 'Slaptažodis',
+        passwordHint: 'Mažiausiai 6 simboliai',
+        firstName: 'Vardas',
+        lastName: 'Pavardė',
+        phone: 'Telefonas',
+        clubName: 'Klubo pavadinimas',
+        clubCity: 'Miestas',
+        clubAddress: 'Adresas (gatvė, namas)',
+      },
+      errors: {
+        duplicate: 'Klubas tokiu pavadinimu jau registruotas šiame mieste',
+        alreadyExists: 'Jūs jau turite registruotą klubą',
+      },
+      status: {
+        pending: {
+          title: 'Paraiška peržiūrima',
+          description: 'Jūsų paraiška pateikta ir laukia administratoriaus peržiūros. Pranešime jums, kai ji bus apdorota.',
+        },
+        active: {
+          title: 'Klubas aktyvus',
+          description: 'Jūsų klubas patvirtintas. Dabar galite kurti turnyrus.',
+        },
+        rejected: {
+          title: 'Paraiška atmesta',
+          description: 'Deja, jūsų paraiška buvo atmesta. Priežastį žiūrėkite žemiau.',
+        },
+        approved: {
+          title: 'Klubas patvirtintas',
+          description: 'Jūsų klubas patvirtintas. Dabar galite kurti turnyrus.',
+        },
+      },
+    },
+    superAdmin: {
+      login: {
+        title: 'Super administratorius',
+        subtitle: 'Prisijungimas prie platformos valdymo skydelio',
+        withGoogle: 'Prisijungti per Google',
+        logout: 'Atsijungti',
+        notAuthorized: 'Ši paskyra neturi super administratoriaus teisių',
+      },
+      brand: 'Administratoriaus skydelis',
+      title: 'Klubų moderavimas',
+      subtitle: 'Teniso klubų registracijos paraiškų peržiūra',
+      filter: {
+        pending: 'Laukiančios',
+        active: 'Aktyvūs',
+        rejected: 'Atmesti',
+        all: 'Visi',
+      },
+      status: {
+        pending: 'Laukia',
+        active: 'Aktyvus',
+        rejected: 'Atmestas',
+      },
+      empty: 'Šioje kategorijoje paraiškų nėra',
+      owner: 'Savininkas',
+      submittedAt: 'Pateikta',
+      contactPhone: 'Kontaktinis telefonas',
+      duplicateWarning: 'Galimas dublikatas: rasta {count} atitikimų pagal pavadinimą ir miestą',
+      approve: 'Patvirtinti',
+      reject: 'Atmesti',
+      confirmReject: 'Patvirtinti atmetimą',
+      cancel: 'Atšaukti',
+      rejectReasonPlaceholder: 'Atmetimo priežastis (neprivaloma)',
+      rejectionReason: 'Atmetimo priežastis',
     },
   },
 }

@@ -8,6 +8,8 @@ export const useAuthStore = defineStore('auth', {
     user: null,
     session: null,
     ready: false,
+    platformRole: null,
+    clubStatus: null, // null | 'pending' | 'active' | 'rejected'
   }),
   actions: {
     async init() {
@@ -44,6 +46,51 @@ export const useAuthStore = defineStore('auth', {
       if (error) {
         throw error
       }
+    },
+
+    async signInWithGoogleForRegistration() {
+      const redirectTo = `${window.location.origin}/register-club?step=complete`
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      })
+      if (error) throw error
+    },
+
+    async signUpWithEmail(email, password) {
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) throw error
+      this.session = data.session
+      this.user = data.session?.user ?? null
+      return data
+    },
+
+    async checkClubStatus() {
+      if (!this.user) {
+        this.clubStatus = null
+        return
+      }
+      const { data } = await supabase
+        .from('clubs')
+        .select('status')
+        .eq('owner_id', this.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      this.clubStatus = data?.status ?? null
+    },
+
+    async checkPlatformRole() {
+      if (!this.user) {
+        this.platformRole = null
+        return
+      }
+      const { data } = await supabase
+        .from('platform_admins')
+        .select('id')
+        .eq('user_id', this.user.id)
+        .maybeSingle()
+      this.platformRole = data ? 'superadmin' : null
     },
 
     async signOut() {

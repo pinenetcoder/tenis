@@ -21,6 +21,12 @@ const layout = computed(() => {
   if (route.name === 'home') {
     return 'login'
   }
+  if (route.path.startsWith('/register-club')) {
+    return 'login'
+  }
+  if (route.path.startsWith('/superadmin')) {
+    return 'superadmin'
+  }
   if (route.path.startsWith('/admin')) {
     return 'admin'
   }
@@ -92,6 +98,37 @@ function goToSettings() {
       </div>
     </header>
 
+    <header v-else-if="layout === 'superadmin' && auth.platformRole === 'superadmin'" class="app-header">
+      <RouterLink class="app-header__brand" :to="{ name: 'superadmin-clubs' }">
+        {{ t('superAdmin.brand') }}
+      </RouterLink>
+      <div class="app-header__actions">
+        <LanguageSwitcher />
+        <div v-if="auth.user" class="profile-menu" @click.stop>
+          <button
+            class="profile-menu__trigger"
+            type="button"
+            :aria-expanded="profileOpen"
+            aria-haspopup="true"
+            @click="toggleProfile"
+          >
+            <span class="profile-menu__avatar">{{ userInitial }}</span>
+          </button>
+          <div v-if="profileOpen" class="profile-menu__dropdown">
+            <div class="profile-menu__info">
+              <span class="profile-menu__name">{{ auth.user.user_metadata?.full_name || auth.user.email }}</span>
+              <span class="profile-menu__email">{{ auth.user.email }}</span>
+            </div>
+            <div class="profile-menu__divider" />
+            <button class="profile-menu__item profile-menu__item--danger" type="button" @click="handleSignOut">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14H3.33A1.33 1.33 0 0 1 2 12.67V3.33A1.33 1.33 0 0 1 3.33 2H6"/><polyline points="10.67 11.33 14 8 10.67 4.67"/><line x1="14" y1="8" x2="6" y2="8"/></svg>
+              {{ t('auth.logout') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
     <header v-else-if="layout === 'public'" class="app-header">
       <span class="app-header__brand">{{ t('app.title') }}</span>
       <div class="app-header__actions">
@@ -102,8 +139,8 @@ function goToSettings() {
     <main
       class="app-main"
       :class="{
-        'app-main--wide': layout === 'admin' || layout === 'public',
-        'app-main--flush': layout === 'login',
+        'app-main--wide': layout === 'admin' || layout === 'public' || (layout === 'superadmin' && auth.platformRole === 'superadmin'),
+        'app-main--flush': layout === 'login' || (layout === 'superadmin' && auth.platformRole !== 'superadmin'),
       }"
     >
       <RouterView />
