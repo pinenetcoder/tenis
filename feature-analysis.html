@@ -703,6 +703,210 @@
     font-family: inherit;
   }
 
+  /* Architecture section */
+  .arch-principle {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--bg-elev) 100%);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    margin-bottom: 32px;
+  }
+  .arch-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .arch-principle-title {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+  .arch-principle-sub {
+    color: var(--text-dim);
+    font-size: 13.5px;
+  }
+
+  .schema-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .schema-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .schema-card.accent {
+    border-top: 3px solid var(--accent);
+    padding-top: 16px;
+  }
+  .schema-title {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .schema-sub {
+    font-size: 12.5px;
+    color: var(--text-mute);
+    margin-bottom: 14px;
+  }
+  .schema-fields {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .schema-fields li {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 5px 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .f-name { color: var(--text); }
+  .f-type { color: var(--text-mute); font-size: 10.5px; }
+  .schema-note {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .stats-scopes {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 700px) { .stats-scopes { grid-template-columns: 1fr; } }
+  .scope-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+  .scope-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .scope-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .scope-dot.info { background: var(--info); }
+  .scope-dot.warn { background: var(--warn); }
+  .scope-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .scope-where {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  .scope-impl {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    color: var(--accent);
+    word-break: break-word;
+  }
+
+  .migration {
+    counter-reset: mig;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .migration li {
+    counter-increment: mig;
+    position: relative;
+    padding: 12px 14px 12px 48px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .migration li strong { color: var(--text); }
+  .migration li::before {
+    content: counter(mig);
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 50%;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .consequences {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .conseq {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .conseq-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 6px;
+    font-family: var(--mono);
+    letter-spacing: 0.02em;
+  }
+  .conseq-body {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -721,10 +925,11 @@
         <a href="#tldr" class="active"><span class="nav-num">01</span>TL;DR</a>
         <a href="#audit"><span class="nav-num">02</span>Аудит</a>
         <a href="#p0"><span class="nav-num">03</span>P0-долг</a>
-        <a href="#formats"><span class="nav-num">04</span>Форматы</a>
-        <a href="#features"><span class="nav-num">05</span>Новые фичи</a>
-        <a href="#roadmap"><span class="nav-num">06</span>Roadmap</a>
-        <a href="#risks"><span class="nav-num">07</span>Риски</a>
+        <a href="#architecture"><span class="nav-num">04</span>Архитектура</a>
+        <a href="#formats"><span class="nav-num">05</span>Форматы</a>
+        <a href="#features"><span class="nav-num">06</span>Новые фичи</a>
+        <a href="#roadmap"><span class="nav-num">07</span>Roadmap</a>
+        <a href="#risks"><span class="nav-num">08</span>Риски</a>
       </nav>
       <div class="sidebar-footer">
         <button class="btn-icon" id="theme-toggle" title="Тема">
@@ -743,10 +948,11 @@
           <option value="#tldr">01 · TL;DR</option>
           <option value="#audit">02 · Аудит</option>
           <option value="#p0">03 · P0-долг</option>
-          <option value="#formats">04 · Форматы</option>
-          <option value="#features">05 · Фичи</option>
-          <option value="#roadmap">06 · Roadmap</option>
-          <option value="#risks">07 · Риски</option>
+          <option value="#architecture">04 · Архитектура</option>
+          <option value="#formats">05 · Форматы</option>
+          <option value="#features">06 · Фичи</option>
+          <option value="#roadmap">07 · Roadmap</option>
+          <option value="#risks">08 · Риски</option>
         </select>
       </div>
 
@@ -820,8 +1026,149 @@
         <div class="p0-grid" id="p0-grid"></div>
       </section>
 
+      <section id="architecture">
+        <h2><span class="section-num">04</span>Архитектура мультитенантности</h2>
+        <p class="section-sub">Клубы + тренеры + игроки. Принцип: <strong>identity is global, relationships are scoped</strong> — как в GitHub, Slack, Stripe Connect.</p>
+
+        <div class="arch-principle">
+          <div class="arch-icon">◆</div>
+          <div>
+            <div class="arch-principle-title">Игрок принадлежит никому</div>
+            <div class="arch-principle-sub">Он — глобальная личность. Клубы и тренеры объединены в Organizations с полем <code>type</code>. Связь игрок ↔ организация — через membership с ролью. Статистика живёт в трёх срезах: глобальная, клубная, коуч-дашборд.</div>
+          </div>
+        </div>
+
+        <h3>Единая абстракция: Organization (клуб = тренер)</h3>
+        <p class="section-sub" style="margin-bottom:16px;">Тренер — это микро-клуб на 1 админа. Одна сущность — одна логика биллинга, прав, витрин. Тренер вырос → меняется <code>type</code>, добавляются корты.</p>
+
+        <div class="schema-grid">
+          <div class="schema-card accent">
+            <div class="schema-title">organizations</div>
+            <div class="schema-sub">Клуб ИЛИ тренер — один тип с дискриминатором</div>
+            <ul class="schema-fields">
+              <li><span class="f-name">id</span> <span class="f-type">uuid PK</span></li>
+              <li><span class="f-name">type</span> <span class="f-type">enum club|coach</span></li>
+              <li><span class="f-name">slug</span> <span class="f-type">text unique</span></li>
+              <li><span class="f-name">name, logo, city</span> <span class="f-type">text</span></li>
+              <li><span class="f-name">owner_user_id</span> <span class="f-type">→ users</span></li>
+              <li><span class="f-name">plan</span> <span class="f-type">enum</span></li>
+            </ul>
+          </div>
+          <div class="schema-card accent">
+            <div class="schema-title">players</div>
+            <div class="schema-sub">ОДИН человек = одна запись, во всей платформе</div>
+            <ul class="schema-fields">
+              <li><span class="f-name">id</span> <span class="f-type">uuid PK</span></li>
+              <li><span class="f-name">user_id</span> <span class="f-type">→ users, null</span></li>
+              <li><span class="f-name">display_name, avatar</span></li>
+              <li><span class="f-name">contact_hash</span> <span class="f-type">для склейки</span></li>
+              <li><span class="f-name">birth_year, gender</span></li>
+              <li><span class="f-name">merged_into</span> <span class="f-type">uuid null</span></li>
+            </ul>
+            <div class="schema-note"><code>contact_hash</code> — нормализованный phone/email. При регистрации ищем совпадение, переиспользуем player или создаём нового.</div>
+          </div>
+          <div class="schema-card accent">
+            <div class="schema-title">org_memberships</div>
+            <div class="schema-sub">Связь игрок ↔ организация (many-to-many)</div>
+            <ul class="schema-fields">
+              <li><span class="f-name">org_id, player_id</span> <span class="f-type">FK</span></li>
+              <li><span class="f-name">role</span> <span class="f-type">member | student | admin | external</span></li>
+              <li><span class="f-name">status</span> <span class="f-type">active | inactive | banned</span></li>
+              <li><span class="f-name">joined_at, expires_at</span></li>
+              <li><span class="f-name">visibility</span> <span class="f-type">full | stats | hidden</span></li>
+              <li><span class="f-name">UNIQUE(org, player)</span></li>
+            </ul>
+            <div class="schema-note">Игрок <strong>одновременно</strong>: member в клубе A, student у тренера B, external в турнире C. Переход — старый membership → inactive.</div>
+          </div>
+        </div>
+
+        <h3>Три среза статистики</h3>
+        <p class="section-sub" style="margin-bottom:16px;">Источник правды — таблицы <code>matches</code> + <code>match_sets</code> (уже есть). Срезы выводятся SQL-views. Материализуем только при перф-проблемах.</p>
+
+        <div class="stats-scopes">
+          <div class="scope-card">
+            <div class="scope-header">
+              <div class="scope-dot"></div>
+              <div class="scope-title">Глобальная</div>
+            </div>
+            <div class="scope-where">Публичный профиль, глобальный ELO, межклубные лидерборды</div>
+            <div class="scope-impl">v_player_stats_global</div>
+          </div>
+          <div class="scope-card">
+            <div class="scope-header">
+              <div class="scope-dot info"></div>
+              <div class="scope-title">Клубная / тренерская</div>
+            </div>
+            <div class="scope-where">Клубный дашборд, клубный ELO, «ТОП клуба»</div>
+            <div class="scope-impl">v_player_stats_by_org(org_id, player_id)</div>
+          </div>
+          <div class="scope-card">
+            <div class="scope-header">
+              <div class="scope-dot warn"></div>
+              <div class="scope-title">Коуч-дашборд</div>
+            </div>
+            <div class="scope-where">«Мои 15 учеников, прогресс за месяц»</div>
+            <div class="scope-impl">v_coach_students(coach_org_id)</div>
+          </div>
+        </div>
+
+        <h3>Рейтинги — одна таблица, два уровня</h3>
+        <div class="schema-grid" style="grid-template-columns:1fr;">
+          <div class="schema-card">
+            <div class="schema-title">player_ratings</div>
+            <div class="schema-sub">Глобальный (org_id null) + клубный (org_id set) — в одной таблице</div>
+            <ul class="schema-fields">
+              <li><span class="f-name">player_id</span> <span class="f-type">→ players</span></li>
+              <li><span class="f-name">org_id</span> <span class="f-type">null = глобальный, set = клубный</span></li>
+              <li><span class="f-name">rating, matches_played, updated_at</span></li>
+              <li><span class="f-name">UNIQUE(player_id, coalesce(org_id, zero_uuid))</span></li>
+            </ul>
+            <div class="schema-note">Игрок может иметь глобальный 1420 и клубный 1580 в клубе A — это нормально и показывает «специализацию».</div>
+          </div>
+        </div>
+
+        <h3>Миграция из текущей схемы (без потери данных)</h3>
+        <ol class="migration">
+          <li>Создать <code>organizations</code>, перелить из <code>clubs</code> с <strong>type='club'</strong>.</li>
+          <li>Для каждого <code>auth.users</code>, создававшего турниры без клуба — создать personal org с <strong>type='coach'</strong>.</li>
+          <li><code>tournaments.club_id</code> → <strong><code>tournaments.org_id</code></strong> (rename FK, legacy турниры линкуются на personal org создателя).</li>
+          <li>Создать <code>players</code> из distinct <code>(full_name, contact_hash)</code> в <code>entry_members</code>, автосклейка по <code>contact_hash</code>.</li>
+          <li>Добавить <code>entry_members.player_id</code> FK, заполнить по contact_hash.</li>
+          <li>Админский merge-инструмент: <code>merge_players(keep_id, drop_id)</code> для дубликатов не по hash (разное написание, смена номера).</li>
+          <li>Одноразовый скрипт: пересчитать <code>player_ratings</code> с нуля по всем завершённым матчам.</li>
+        </ol>
+
+        <h3>Ключевые следствия</h3>
+        <div class="consequences">
+          <div class="conseq">
+            <div class="conseq-title">Multi-org игрок</div>
+            <div class="conseq-body">Иванов одновременно в клубе A (<code>member</code>), у тренера B (<code>student</code>), в турнире клуба C (<code>external</code>). Все рейтинги актуальны параллельно.</div>
+          </div>
+          <div class="conseq">
+            <div class="conseq-title">Переход без потерь</div>
+            <div class="conseq-body">Ушёл из клуба → старый membership <code>status='inactive'</code>, новый создаётся. История матчей сохранена, видна и игроку, и старому, и новому клубу.</div>
+          </div>
+          <div class="conseq">
+            <div class="conseq-title">Внешние игроки</div>
+            <div class="conseq-body">Open-турнир без членства: запись в <code>players</code>, без <code>org_memberships</code>. Позже клуб может пригласить — создаётся membership.</div>
+          </div>
+          <div class="conseq">
+            <div class="conseq-title">Тренер внутри клуба</div>
+            <div class="conseq-body">Роль <code>admin</code> в org клуба + тег «coach». Если тренер хочет свой биллинг — ДВЕ org (personal <code>type='coach'</code> + <code>admin</code> в клубной).</div>
+          </div>
+          <div class="conseq">
+            <div class="conseq-title">Приватность</div>
+            <div class="conseq-body">Публичный профиль: имя, avatar, W/L, глобальный ELO. Контакты/дата рождения — только своим (<code>member</code>/<code>student</code>) через <code>membership.visibility</code>.</div>
+          </div>
+          <div class="conseq">
+            <div class="conseq-title">GDPR-delete</div>
+            <div class="conseq-body">Soft-delete игрока: имя → «Удалённый игрок», contact_hash → null. Матчи сохраняются, чтобы не сломать статистику соперников.</div>
+          </div>
+        </div>
+      </section>
+
       <section id="formats">
-        <h2><span class="section-num">04</span>Альтернативные форматы сеток</h2>
+        <h2><span class="section-num">05</span>Альтернативные форматы сеток</h2>
         <p class="section-sub">Сейчас только <code>single_elimination</code>. Ниже — 9 форматов с оценкой сложности и B2B-ценности. <span style="color:var(--accent)">★</span> — клубная ценность.</p>
 
         <div class="filterbar">
@@ -836,7 +1183,7 @@
       </section>
 
       <section id="features">
-        <h2><span class="section-num">05</span>Новые фичи</h2>
+        <h2><span class="section-num">06</span>Новые фичи</h2>
         <p class="section-sub">Идеи, которых нет в FEATURE_RESEARCH.md. Фильтр по категории или поиск по словам.</p>
 
         <div class="filterbar">
@@ -855,14 +1202,14 @@
       </section>
 
       <section id="roadmap">
-        <h2><span class="section-num">06</span>Пересмотр приоритетов 3–6 месяцев</h2>
+        <h2><span class="section-num">07</span>Пересмотр приоритетов 3–6 месяцев</h2>
         <p class="section-sub">Hybrid-модель «клубы + индивидуалы». Что делаем, что осознанно откладываем.</p>
 
         <div class="roadmap" id="roadmap"></div>
       </section>
 
       <section id="risks">
-        <h2><span class="section-num">07</span>Риски и допущения</h2>
+        <h2><span class="section-num">08</span>Риски и допущения</h2>
         <p class="section-sub">Чем придётся заплатить за выбранное направление.</p>
 
         <div class="risks" id="risks"></div>
