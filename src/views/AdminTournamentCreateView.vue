@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -21,7 +21,21 @@ const form = reactive({
   set_format: 'best_of_3',
   is_public: true,
   doubles_pairing_random: false,
+  org_id: '',
 })
+
+const orgs = computed(() => auth.ownedOrganizations ?? [])
+const showOrgPicker = computed(() => orgs.value.length > 1)
+const onlyOrg = computed(() => (orgs.value.length === 1 ? orgs.value[0] : null))
+
+function pickDefaultOrg() {
+  if (!orgs.value.length) {
+    form.org_id = ''
+    return
+  }
+  const club = orgs.value.find((o) => o.type === 'club')
+  form.org_id = (club ?? orgs.value[0]).id
+}
 
 function slugify(value) {
   const normalized = value
@@ -58,6 +72,7 @@ async function createTournament() {
       form.category === 'doubles'
         ? (form.doubles_pairing_random ? 'pick_random' : 'pre_agreed')
         : null,
+    p_org_id: form.org_id || null,
   })
 
   saving.value = false
@@ -80,6 +95,8 @@ function cancel() {
 
 onMounted(async () => {
   await auth.init()
+  await auth.loadPlayerContext()
+  pickDefaultOrg()
 })
 </script>
 
@@ -89,6 +106,18 @@ onMounted(async () => {
     <p class="muted">{{ t('admin.createPageHint') }}</p>
 
     <form class="card stack stack--sm" @submit.prevent="createTournament">
+      <div v-if="showOrgPicker" class="form-field">
+        <label for="create-org">{{ t('admin.organization') }}</label>
+        <select id="create-org" v-model="form.org_id" class="input" required>
+          <option v-for="o in orgs" :key="o.id" :value="o.id">
+            {{ o.name }}{{ o.type === 'coach' ? ` — ${t('admin.orgPersonal')}` : '' }}
+          </option>
+        </select>
+      </div>
+      <p v-else-if="onlyOrg" class="muted" style="font-size: var(--font-sm)">
+        {{ t('admin.organizationFixed', { name: onlyOrg.name }) }}
+      </p>
+
       <div class="form-field">
         <label for="create-name">{{ t('admin.name') }}</label>
         <input id="create-name" v-model="form.name" class="input" type="text" required />

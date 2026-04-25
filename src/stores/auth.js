@@ -10,6 +10,10 @@ export const useAuthStore = defineStore('auth', {
     ready: false,
     platformRole: null,
     clubStatus: null, // null | 'pending' | 'active' | 'rejected'
+    currentPlayer: null,       // { id, display_name, avatar_url, ... }
+    memberships: [],           // active org memberships
+    ownedOrganizations: [],    // orgs where user is owner or admin
+    playerContextLoaded: false,
   }),
   actions: {
     async init() {
@@ -31,9 +35,47 @@ export const useAuthStore = defineStore('auth', {
           this.session = session
           this.user = session?.user ?? null
           this.ready = true
+          if (!session) {
+            this.currentPlayer = null
+            this.memberships = []
+            this.ownedOrganizations = []
+            this.playerContextLoaded = false
+          }
         })
         authSubscription = subscriptionData.subscription
       }
+    },
+
+    async loadPlayerContext({ force = false } = {}) {
+      if (!this.user) {
+        this.currentPlayer = null
+        this.memberships = []
+        this.ownedOrganizations = []
+        this.playerContextLoaded = true
+        return
+      }
+      if (this.playerContextLoaded && !force) return
+
+      const [{ data: player }, { data: orgs }] = await Promise.all([
+        supabase.from('players').select('*').eq('user_id', this.user.id).maybeSingle(),
+        supabase.rpc('my_organizations'),
+      ])
+
+      this.currentPlayer = player ?? null
+      this.ownedOrganizations = orgs ?? []
+
+      if (player) {
+        const { data: memberships } = await supabase
+          .from('org_memberships')
+          .select('id, org_id, role, status, is_primary, joined_at, organizations(slug, name, logo_url, type)')
+          .eq('player_id', player.id)
+          .in('status', ['active', 'pending'])
+        this.memberships = memberships ?? []
+      } else {
+        this.memberships = []
+      }
+
+      this.playerContextLoaded = true
     },
 
     async signInWithGoogle() {
@@ -70,14 +112,9 @@ export const useAuthStore = defineStore('auth', {
         this.clubStatus = null
         return
       }
-      const { data } = await supabase
-        .from('clubs')
-        .select('status')
-        .eq('owner_id', this.user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      this.clubStatus = data?.status ?? null
+      const { data } = await supabase.rpc('my_club_registration')
+      const club = Array.isArray(data) ? (data[0] ?? null) : data
+      this.clubStatus = club?.status ?? null
     },
 
     async checkPlatformRole() {

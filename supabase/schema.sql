@@ -49,6 +49,115 @@ exception
   when duplicate_object then null;
 end $$;
 
+do $$ begin
+  create type org_type as enum ('club', 'coach');
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type membership_role as enum ('member', 'student', 'admin', 'external');
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type membership_status as enum ('pending', 'active', 'inactive', 'banned', 'rejected', 'expired', 'pending_payment');
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type membership_visibility as enum ('full', 'stats_only', 'hidden');
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type organization_status as enum ('pending', 'active', 'rejected');
+exception
+  when duplicate_object then null;
+end $$;
+
+create table if not exists organizations (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique,
+  type org_type not null,
+  name text not null,
+  description text,
+  logo_url text,
+  city text,
+  country text,
+  address text,
+  contact_email text,
+  contact_phone text,
+  owner_user_id uuid references auth.users (id) on delete restrict,
+  plan text default 'free',
+  auto_approve_members boolean not null default true,
+  status organization_status not null default 'active',
+  is_active boolean not null default true,
+  rejection_reason text,
+  reviewed_by uuid references auth.users (id),
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists players (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid unique references auth.users (id) on delete set null,
+  display_name text not null,
+  avatar_url text,
+  contact_hash text,
+  birth_year integer,
+  gender text check (gender in ('male', 'female', 'other')),
+  country text,
+  merged_into uuid references players (id) on delete set null,
+  is_deleted boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists idx_players_contact
+  on players (contact_hash)
+  where contact_hash is not null and is_deleted = false;
+
+create table if not exists org_memberships (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references organizations (id) on delete cascade,
+  player_id uuid not null references players (id) on delete cascade,
+  role membership_role not null default 'member',
+  status membership_status not null default 'pending',
+  visibility membership_visibility not null default 'full',
+  is_primary boolean not null default false,
+  invited_by uuid references auth.users (id),
+  review_note text,
+  joined_at timestamptz,
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (org_id, player_id)
+);
+
+create table if not exists org_invites (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references organizations (id) on delete cascade,
+  token text unique not null
+    default replace(translate(encode(gen_random_bytes(24), 'base64'), '+/', '-_'), '=', ''),
+  contact_email text,
+  contact_phone text,
+  contact_hash text not null,
+  player_id uuid references players (id),
+  role membership_role not null default 'member',
+  message text,
+  invited_by uuid not null references auth.users (id),
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted', 'rejected', 'expired', 'revoked')),
+  expires_at timestamptz not null default (now() + interval '30 days'),
+  accepted_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists tournaments (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -60,6 +169,7 @@ create table if not exists tournaments (
   status tournament_status not null default 'draft',
   is_public boolean not null default true,
   doubles_pairing_mode doubles_pairing_mode,
+  org_id uuid references organizations (id) on delete restrict,
   created_by uuid not null references auth.users (id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -95,9 +205,30 @@ create table if not exists entry_members (
   entry_id uuid not null references entries (id) on delete cascade,
   member_name text not null,
   member_order integer not null check (member_order in (1, 2)),
+  player_id uuid references players (id) on delete set null,
   created_at timestamptz not null default now(),
   unique (entry_id, member_order)
 );
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'tournaments' and column_name = 'org_id'
+  ) then
+    alter table tournaments add column org_id uuid references organizations(id) on delete restrict;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'entry_members' and column_name = 'player_id'
+  ) then
+    alter table entry_members add column player_id uuid references players(id) on delete set null;
+  end if;
+end $$;
 
 create table if not exists matches (
   id uuid primary key default gen_random_uuid(),
@@ -134,6 +265,20 @@ create table if not exists bracket_versions (
 );
 
 create index if not exists idx_bracket_versions_tournament on bracket_versions (tournament_id);
+create index if not exists idx_org_owner on organizations (owner_user_id);
+create index if not exists idx_org_type on organizations (type);
+create index if not exists idx_organizations_status on organizations (status);
+create index if not exists idx_players_user on players (user_id);
+create index if not exists idx_memberships_org on org_memberships (org_id);
+create index if not exists idx_memberships_player on org_memberships (player_id);
+create index if not exists idx_memberships_status on org_memberships (status);
+create unique index if not exists idx_memberships_primary
+  on org_memberships (player_id) where is_primary = true;
+create index if not exists idx_invites_token on org_invites (token);
+create index if not exists idx_invites_org on org_invites (org_id);
+create index if not exists idx_invites_contact on org_invites (contact_hash);
+create index if not exists idx_tournaments_org on tournaments (org_id);
+create index if not exists idx_entry_members_player on entry_members (player_id);
 create index if not exists idx_tournament_admins_user on tournament_admins (user_id);
 create index if not exists idx_entries_tournament on entries (tournament_id, status);
 create index if not exists idx_matches_tournament on matches (tournament_id, round_number, match_number);
@@ -152,6 +297,24 @@ $$;
 drop trigger if exists trg_tournaments_updated_at on tournaments;
 create trigger trg_tournaments_updated_at
 before update on tournaments
+for each row
+execute function set_updated_at();
+
+drop trigger if exists trg_organizations_updated_at on organizations;
+create trigger trg_organizations_updated_at
+before update on organizations
+for each row
+execute function set_updated_at();
+
+drop trigger if exists trg_players_updated_at on players;
+create trigger trg_players_updated_at
+before update on players
+for each row
+execute function set_updated_at();
+
+drop trigger if exists trg_memberships_updated_at on org_memberships;
+create trigger trg_memberships_updated_at
+before update on org_memberships
 for each row
 execute function set_updated_at();
 
@@ -185,6 +348,49 @@ as $$
     from tournament_admins ta
     where ta.tournament_id = p_tournament_id
       and ta.user_id = auth.uid()
+  );
+$$;
+
+create or replace function normalize_contact(p_contact text)
+returns text
+language sql
+immutable
+as $$
+  select regexp_replace(lower(coalesce(trim(p_contact), '')), '\s|-|\+|\(|\)', '', 'g');
+$$;
+
+create or replace function hash_contact(p_contact text)
+returns text
+language sql
+immutable
+set search_path = public, extensions
+as $$
+  select case
+    when p_contact is null or btrim(p_contact) = '' then null
+    else encode(extensions.digest(normalize_contact(p_contact), 'sha256'), 'hex')
+  end;
+$$;
+
+create or replace function is_org_admin(p_org_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from organizations o
+    where o.id = p_org_id
+      and o.owner_user_id = auth.uid()
+  ) or exists (
+    select 1
+    from org_memberships m
+    join players p on p.id = m.player_id
+    where m.org_id = p_org_id
+      and m.role = 'admin'
+      and m.status = 'active'
+      and p.user_id = auth.uid()
   );
 $$;
 
@@ -405,6 +611,16 @@ begin
 end;
 $$;
 
+drop function if exists create_tournament(
+  text,
+  text,
+  text,
+  tournament_category,
+  set_format,
+  boolean,
+  doubles_pairing_mode
+);
+
 create or replace function create_tournament(
   p_name text,
   p_slug text,
@@ -412,7 +628,8 @@ create or replace function create_tournament(
   p_category tournament_category default 'singles',
   p_set_format set_format default 'best_of_3',
   p_is_public boolean default true,
-  p_doubles_pairing_mode doubles_pairing_mode default null
+  p_doubles_pairing_mode doubles_pairing_mode default null,
+  p_org_id uuid default null
 )
 returns uuid
 language plpgsql
@@ -422,15 +639,56 @@ as $$
 declare
   v_id uuid;
   v_uid uuid := auth.uid();
+  v_org_id uuid := p_org_id;
+  v_profile_name text;
 begin
   if v_uid is null then
     raise exception 'Authentication required';
   end if;
 
-  insert into tournaments (name, slug, description, category, set_format, status, is_public, doubles_pairing_mode, created_by)
-  values (p_name, p_slug, p_description, p_category, p_set_format, 'registration_open', p_is_public,
-          case when p_category = 'doubles' then coalesce(p_doubles_pairing_mode, 'pre_agreed') else null end,
-          v_uid)
+  if v_org_id is null then
+    select id into v_org_id
+    from organizations
+    where owner_user_id = v_uid
+    order by created_at asc
+    limit 1;
+  else
+    if not is_org_admin(v_org_id) then
+      raise exception 'Forbidden for this organization';
+    end if;
+  end if;
+
+  if v_org_id is null then
+    select nullif(btrim(concat_ws(' ', first_name, last_name)), '')
+      into v_profile_name
+    from user_profiles
+    where id = v_uid;
+
+    insert into organizations (slug, type, name, owner_user_id)
+    values (
+      'coach-' || substring(v_uid::text, 1, 8),
+      'coach',
+      coalesce(v_profile_name, 'Coach') || ' (coach)',
+      v_uid
+    )
+    on conflict (slug) do update
+      set name = excluded.name
+    returning id into v_org_id;
+  end if;
+
+  insert into tournaments (name, slug, description, category, set_format, status, is_public, doubles_pairing_mode, created_by, org_id)
+  values (
+    p_name,
+    p_slug,
+    p_description,
+    p_category,
+    p_set_format,
+    'registration_open',
+    p_is_public,
+    case when p_category = 'doubles' then coalesce(p_doubles_pairing_mode, 'pre_agreed') else null end,
+    v_uid,
+    v_org_id
+  )
   returning id into v_id;
 
   insert into tournament_admins (tournament_id, user_id, role)
@@ -1512,8 +1770,11 @@ using (
   )
 );
 
-grant execute on function create_tournament(text, text, text, tournament_category, set_format, boolean, doubles_pairing_mode) to authenticated;
+grant execute on function create_tournament(text, text, text, tournament_category, set_format, boolean, doubles_pairing_mode, uuid) to authenticated;
 grant execute on function register_entry(text, tournament_category, text, text, text, text) to anon, authenticated;
+grant execute on function normalize_contact(text) to authenticated;
+grant execute on function hash_contact(text) to authenticated;
+grant execute on function is_org_admin(uuid) to authenticated;
 grant execute on function generate_bracket(uuid, draw_mode, uuid[]) to authenticated;
 grant execute on function rebuild_bracket(uuid, draw_mode, uuid[]) to authenticated;
 grant execute on function update_match_sets(uuid, jsonb) to authenticated;

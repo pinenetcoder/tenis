@@ -103,13 +103,13 @@ async function submitRegistration() {
   loading.value = true
   errorText.value = ''
   try {
-    const { error } = await supabase.rpc('register_club', {
+    const { error } = await supabase.rpc('register_organization', {
       p_first_name: form.firstName.trim(),
       p_last_name: form.lastName.trim(),
       p_phone: form.phone.trim() || null,
-      p_club_name: form.clubName.trim(),
-      p_club_city: form.clubCity.trim(),
-      p_club_address: form.clubAddress.trim() || null,
+      p_org_name: form.clubName.trim(),
+      p_org_city: form.clubCity.trim(),
+      p_org_address: form.clubAddress.trim() || null,
       p_contact_email: form.email || null,
       p_contact_phone: form.phone.trim() || null,
     })

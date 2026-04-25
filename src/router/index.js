@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/auth'
 
 const HomeView = () => import('../views/HomeView.vue')
 const PublicTournamentView = () => import('../views/PublicTournamentView.vue')
+const ClubPageView = () => import('../views/ClubPageView.vue')
 const ClubRegistrationView = () => import('../views/ClubRegistrationView.vue')
 const ClubRegistrationStatusView = () => import('../views/ClubRegistrationStatusView.vue')
 const AdminLayout = () => import('../views/AdminLayout.vue')
@@ -10,6 +11,8 @@ const AdminTournamentListView = () => import('../views/AdminTournamentListView.v
 const AdminTournamentCreateView = () => import('../views/AdminTournamentCreateView.vue')
 const AdminTournamentView = () => import('../views/AdminTournamentView.vue')
 const AdminSettingsView = () => import('../views/AdminSettingsView.vue')
+const ClubSettingsView = () => import('../views/ClubSettingsView.vue')
+const InviteAcceptView = () => import('../views/InviteAcceptView.vue')
 const SuperAdminLayout = () => import('../views/SuperAdminLayout.vue')
 const SuperAdminDashboardView = () => import('../views/SuperAdminDashboardView.vue')
 
@@ -38,6 +41,18 @@ const router = createRouter({
       path: '/tournaments/:slug',
       name: 'public-tournament',
       component: PublicTournamentView,
+      props: true,
+    },
+    {
+      path: '/clubs/:slug',
+      name: 'public-club',
+      component: ClubPageView,
+      props: true,
+    },
+    {
+      path: '/invites/:token',
+      name: 'invite-accept',
+      component: InviteAcceptView,
       props: true,
     },
     {
@@ -99,6 +114,11 @@ const router = createRouter({
           path: 'settings',
           name: 'admin-settings',
           component: AdminSettingsView,
+        },
+        {
+          path: 'club',
+          name: 'admin-club-settings',
+          component: ClubSettingsView,
         },
       ],
     },

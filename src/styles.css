@@ -2599,6 +2599,39 @@ textarea.input:focus {
   opacity: 0.7;
 }
 
+.profile-menu__section-label {
+  padding: var(--space-2) var(--space-4) calc(var(--space-1) / 2);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.profile-menu__item--locale {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  justify-content: flex-start;
+}
+
+.profile-menu__locale-label {
+  font-weight: 600;
+  width: 24px;
+}
+
+.profile-menu__locale-name {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.profile-menu__item--active {
+  background: var(--surface-hover);
+}
+
+.profile-menu__item--active .profile-menu__locale-label {
+  color: var(--primary);
+}
+
 /* Participant list */
 .participant-list {
   display: flex;

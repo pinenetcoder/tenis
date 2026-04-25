@@ -36,14 +36,8 @@ onMounted(async () => {
 
 async function loadClub() {
   loading.value = true
-  const { data } = await supabase
-    .from('clubs')
-    .select('*')
-    .eq('owner_id', auth.user.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  club.value = data
+  const { data } = await supabase.rpc('my_club_registration')
+  club.value = Array.isArray(data) ? (data[0] ?? null) : data
   loading.value = false
 }
 

@@ -37,10 +37,10 @@ onMounted(async () => {
 async function loadClubs() {
   loading.value = true
   errorText.value = ''
-  const { data, error } = await supabase.rpc('get_pending_clubs')
+  const { data, error } = await supabase.rpc('list_organizations_for_review')
   if (error) {
     errorText.value = error.message
-    console.error('get_pending_clubs error:', error)
+    console.error('list_organizations_for_review error:', error)
   } else {
     clubs.value = data || []
   }
@@ -49,7 +49,11 @@ async function loadClubs() {
 
 async function approveClub(id) {
   actionLoading.value = id
-  const { error } = await supabase.rpc('approve_club', { p_club_id: id })
+  errorText.value = ''
+  const { error } = await supabase.rpc('approve_organization', { p_org_id: id })
+  if (error) {
+    errorText.value = error.message
+  }
   if (!error) {
     await loadClubs()
   }
@@ -69,10 +73,14 @@ function cancelReject() {
 async function confirmReject() {
   if (!rejectingId.value) return
   actionLoading.value = rejectingId.value
-  const { error } = await supabase.rpc('reject_club', {
-    p_club_id: rejectingId.value,
+  errorText.value = ''
+  const { error } = await supabase.rpc('reject_organization', {
+    p_org_id: rejectingId.value,
     p_reason: rejectReason.value.trim() || null,
   })
+  if (error) {
+    errorText.value = error.message
+  }
   if (!error) {
     rejectingId.value = null
     rejectReason.value = ''

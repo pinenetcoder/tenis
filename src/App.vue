@@ -4,14 +4,56 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import { clubContext, headerTitle } from './lib/headerTitle'
+import { supabase } from './lib/supabase'
 import { useAuthStore } from './stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const profileOpen = ref(false)
+const membershipBusy = ref(false)
+
+const locales = [
+  { code: 'ru', label: 'RU', name: 'Русский' },
+  { code: 'en', label: 'EN', name: 'English' },
+  { code: 'lt', label: 'LT', name: 'Lietuvių' },
+]
+
+function setLocale(code) {
+  locale.value = code
+  try { localStorage.setItem('champ_locale', code) } catch { /* ignore */ }
+}
+
+const activeMembership = computed(() => {
+  const m = clubContext.value?.membership
+  return m && m.status === 'active' ? m : null
+})
+
+async function makePrimaryClub() {
+  if (membershipBusy.value || !clubContext.value) return
+  membershipBusy.value = true
+  const { error } = await supabase.rpc('set_primary_club', {
+    p_org_id: clubContext.value.orgId,
+  })
+  membershipBusy.value = false
+  profileOpen.value = false
+  if (!error) clubContext.value.onChanged?.()
+}
+
+async function leaveClub() {
+  if (membershipBusy.value || !clubContext.value) return
+  if (!window.confirm(t('club.join.confirmLeave'))) return
+  membershipBusy.value = true
+  const { error } = await supabase.rpc('leave_organization', {
+    p_org_id: clubContext.value.orgId,
+  })
+  membershipBusy.value = false
+  profileOpen.value = false
+  if (!error) clubContext.value.onChanged?.()
+}
 
 onMounted(async () => {
   await auth.init()
@@ -30,7 +72,11 @@ const layout = computed(() => {
   if (route.path.startsWith('/admin')) {
     return 'admin'
   }
-  if (route.name === 'public-tournament') {
+  if (
+    route.name === 'public-tournament'
+    || route.name === 'public-club'
+    || route.name === 'invite-accept'
+  ) {
     return 'public'
   }
   return 'default'
@@ -58,6 +104,11 @@ async function handleSignOut() {
 function goToSettings() {
   profileOpen.value = false
   router.push({ name: 'admin-settings' })
+}
+
+function goToClubSettings() {
+  profileOpen.value = false
+  router.push({ name: 'admin-club-settings' })
 }
 </script>
 
@@ -88,6 +139,10 @@ function goToSettings() {
             <button class="profile-menu__item" type="button" @click="goToSettings">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.5"/><path d="M13.3 10a1.1 1.1 0 0 0 .2 1.2l.04.04a1.33 1.33 0 1 1-1.89 1.89l-.04-.04a1.1 1.1 0 0 0-1.2-.2 1.1 1.1 0 0 0-.67 1.01v.11a1.33 1.33 0 1 1-2.67 0v-.06A1.1 1.1 0 0 0 6 12.8a1.1 1.1 0 0 0-1.2.2l-.04.04a1.33 1.33 0 1 1-1.89-1.89l.04-.04a1.1 1.1 0 0 0 .2-1.2 1.1 1.1 0 0 0-1.01-.67h-.11a1.33 1.33 0 0 1 0-2.67H2.06A1.1 1.1 0 0 0 3.2 6a1.1 1.1 0 0 0-.2-1.2l-.04-.04a1.33 1.33 0 1 1 1.89-1.89l.04.04a1.1 1.1 0 0 0 1.2.2h.05a1.1 1.1 0 0 0 .67-1.01v-.11a1.33 1.33 0 1 1 2.67 0V2.06A1.1 1.1 0 0 0 10 3.2a1.1 1.1 0 0 0 1.2-.2l.04-.04a1.33 1.33 0 1 1 1.89 1.89l-.04.04a1.1 1.1 0 0 0-.2 1.2v.05a1.1 1.1 0 0 0 1.01.67h.11a1.33 1.33 0 0 1 0 2.67h-.06a1.1 1.1 0 0 0-1.01.67Z"/></svg>
               {{ t('admin.settingsTitle') }}
+            </button>
+            <button class="profile-menu__item" type="button" @click="goToClubSettings">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l5-4 5 4v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/><path d="M6 14v-4h4v4"/></svg>
+              {{ t('club.settings.title') }}
             </button>
             <button class="profile-menu__item profile-menu__item--danger" type="button" @click="handleSignOut">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14H3.33A1.33 1.33 0 0 1 2 12.67V3.33A1.33 1.33 0 0 1 3.33 2H6"/><polyline points="10.67 11.33 14 8 10.67 4.67"/><line x1="14" y1="8" x2="6" y2="8"/></svg>
@@ -130,9 +185,73 @@ function goToSettings() {
     </header>
 
     <header v-else-if="layout === 'public'" class="app-header">
-      <span class="app-header__brand">{{ t('app.title') }}</span>
+      <span class="app-header__brand">{{ headerTitle || t('app.title') }}</span>
       <div class="app-header__actions">
-        <LanguageSwitcher />
+        <LanguageSwitcher v-if="!auth.user" />
+        <div v-else class="profile-menu" @click.stop>
+          <button
+            class="profile-menu__trigger"
+            type="button"
+            :aria-expanded="profileOpen"
+            aria-haspopup="true"
+            @click="toggleProfile"
+          >
+            <span class="profile-menu__avatar">{{ userInitial }}</span>
+          </button>
+          <div v-if="profileOpen" class="profile-menu__dropdown">
+            <div class="profile-menu__info">
+              <span class="profile-menu__name">{{ auth.user.user_metadata?.full_name || auth.user.email }}</span>
+              <span class="profile-menu__email">{{ auth.user.email }}</span>
+            </div>
+            <div class="profile-menu__divider" />
+
+            <template v-if="activeMembership">
+              <div class="profile-menu__section-label">
+                {{ t('club.join.youreMember') }}
+                <span v-if="activeMembership.is_primary" class="badge badge--success" style="margin-left:6px;">
+                  ★ {{ t('club.join.primary') }}
+                </span>
+              </div>
+              <button
+                v-if="!activeMembership.is_primary"
+                class="profile-menu__item"
+                type="button"
+                :disabled="membershipBusy"
+                @click="makePrimaryClub"
+              >
+                ★ {{ t('club.join.makePrimary') }}
+              </button>
+              <button
+                class="profile-menu__item profile-menu__item--danger"
+                type="button"
+                :disabled="membershipBusy"
+                @click="leaveClub"
+              >
+                {{ t('club.join.leave') }}
+              </button>
+              <div class="profile-menu__divider" />
+            </template>
+
+            <div class="profile-menu__section-label">{{ t('app.language') }}</div>
+            <button
+              v-for="loc in locales"
+              :key="loc.code"
+              type="button"
+              class="profile-menu__item profile-menu__item--locale"
+              :class="{ 'profile-menu__item--active': locale === loc.code }"
+              @click="setLocale(loc.code)"
+            >
+              <span class="profile-menu__locale-label">{{ loc.label }}</span>
+              <span class="profile-menu__locale-name">{{ loc.name }}</span>
+            </button>
+            <div class="profile-menu__divider" />
+
+            <button class="profile-menu__item profile-menu__item--danger" type="button" @click="handleSignOut">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14H3.33A1.33 1.33 0 0 1 2 12.67V3.33A1.33 1.33 0 0 1 3.33 2H6"/><polyline points="10.67 11.33 14 8 10.67 4.67"/><line x1="14" y1="8" x2="6" y2="8"/></svg>
+              {{ t('auth.logout') }}
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
