@@ -55,8 +55,17 @@ async function leaveClub() {
   if (!error) clubContext.value.onChanged?.()
 }
 
+const isCounterOnly = computed(() =>
+  auth.tournamentRolesLoaded
+    && auth.tournamentRoles.length > 0
+    && auth.tournamentRoles.every((r) => r === 'counter')
+    && auth.clubStatus !== 'active'
+)
+
 onMounted(async () => {
   await auth.init()
+  auth.checkClubStatus()
+  auth.loadTournamentRoles()
 })
 
 const layout = computed(() => {
@@ -140,7 +149,7 @@ function goToClubSettings() {
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.5"/><path d="M13.3 10a1.1 1.1 0 0 0 .2 1.2l.04.04a1.33 1.33 0 1 1-1.89 1.89l-.04-.04a1.1 1.1 0 0 0-1.2-.2 1.1 1.1 0 0 0-.67 1.01v.11a1.33 1.33 0 1 1-2.67 0v-.06A1.1 1.1 0 0 0 6 12.8a1.1 1.1 0 0 0-1.2.2l-.04.04a1.33 1.33 0 1 1-1.89-1.89l.04-.04a1.1 1.1 0 0 0 .2-1.2 1.1 1.1 0 0 0-1.01-.67h-.11a1.33 1.33 0 0 1 0-2.67H2.06A1.1 1.1 0 0 0 3.2 6a1.1 1.1 0 0 0-.2-1.2l-.04-.04a1.33 1.33 0 1 1 1.89-1.89l.04.04a1.1 1.1 0 0 0 1.2.2h.05a1.1 1.1 0 0 0 .67-1.01v-.11a1.33 1.33 0 1 1 2.67 0V2.06A1.1 1.1 0 0 0 10 3.2a1.1 1.1 0 0 0 1.2-.2l.04-.04a1.33 1.33 0 1 1 1.89 1.89l-.04.04a1.1 1.1 0 0 0-.2 1.2v.05a1.1 1.1 0 0 0 1.01.67h.11a1.33 1.33 0 0 1 0 2.67h-.06a1.1 1.1 0 0 0-1.01.67Z"/></svg>
               {{ t('admin.settingsTitle') }}
             </button>
-            <button class="profile-menu__item" type="button" @click="goToClubSettings">
+            <button v-if="!isCounterOnly" class="profile-menu__item" type="button" @click="goToClubSettings">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l5-4 5 4v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/><path d="M6 14v-4h4v4"/></svg>
               {{ t('club.settings.title') }}
             </button>

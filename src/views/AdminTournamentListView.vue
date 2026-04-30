@@ -19,7 +19,28 @@ const copyFeedback = ref(false)
 const tournaments = ref([])
 const statusFilter = ref('active')
 
+const hasManagerTournament = computed(() =>
+  tournaments.value.some((item) => item.currentRole === 'owner' || item.currentRole === 'editor'),
+)
+
+const hasCounterOnlyTournaments = computed(() =>
+  tournaments.value.length > 0 && tournaments.value.every((item) => item.currentRole === 'counter'),
+)
+
+const canCreateTournament = computed(
+  () => !hasCounterOnlyTournaments.value && (auth.clubStatus === 'active' || hasManagerTournament.value),
+)
+
+const pageTitle = computed(() =>
+  hasCounterOnlyTournaments.value ? t('admin.counterTournamentsListTitle') : t('admin.tournamentsListTitle'),
+)
+
+const pageHint = computed(() =>
+  hasCounterOnlyTournaments.value ? t('admin.counterTournamentsListHint') : t('admin.tournamentsListHint'),
+)
+
 const filteredTournaments = computed(() => {
+  if (hasCounterOnlyTournaments.value) return tournaments.value
   const list = tournaments.value
   if (statusFilter.value === 'all') {
     return list
@@ -44,6 +65,7 @@ async function loadTournaments() {
     .select(
       `
       tournament_id,
+      role,
       tournaments (
         id,
         name,
@@ -67,9 +89,19 @@ async function loadTournaments() {
   }
 
   const rows = data || []
-  const list = rows.map((row) => row.tournaments).filter((t) => t != null)
+  const list = rows
+    .map((row) => row.tournaments ? { ...row.tournaments, currentRole: row.role } : null)
+    .filter((t) => t != null)
   list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   tournaments.value = list
+}
+
+function tournamentTarget(item) {
+  return {
+    name: 'admin-tournament',
+    params: { id: item.id },
+    hash: item.currentRole === 'counter' ? '#bracket' : '',
+  }
 }
 
 function formatDate(iso) {
@@ -132,6 +164,7 @@ watch(
 
 onMounted(async () => {
   await auth.init()
+  await auth.checkClubStatus()
   await loadTournaments()
 })
 </script>
@@ -139,19 +172,19 @@ onMounted(async () => {
 <template>
   <div class="stack">
     <div class="admin-list-header">
-      <h1 class="page-title" style="margin: 0">{{ t('admin.tournamentsListTitle') }}</h1>
+      <h1 class="page-title" style="margin: 0">{{ pageTitle }}</h1>
       <div class="admin-list-header__actions">
         <!-- <button class="btn btn--ghost btn--sm" type="button" @click="loadTournaments">
           {{ t('actions.refresh') }}
         </button> -->
-        <RouterLink class="btn btn--primary btn--sm" :to="{ name: 'admin-tournament-new' }">
+        <RouterLink v-if="canCreateTournament" class="btn btn--primary btn--sm" :to="{ name: 'admin-tournament-new' }">
           {{ t('admin.createTournament') }}
         </RouterLink>
       </div>
     </div>
-    <p class="muted">{{ t('admin.tournamentsListHint') }}</p>
+    <p class="muted">{{ pageHint }}</p>
 
-    <div class="filter-segment" role="group" :aria-label="t('admin.filterLabel')">
+    <div v-if="!hasCounterOnlyTournaments" class="filter-segment" role="group" :aria-label="t('admin.filterLabel')">
       <button
         type="button"
         class="filter-segment__btn"
@@ -188,8 +221,8 @@ onMounted(async () => {
         class="tournament-row tournament-row--clickable"
         tabindex="0"
         role="link"
-        @click="router.push({ name: 'admin-tournament', params: { id: item.id } })"
-        @keydown.enter="router.push({ name: 'admin-tournament', params: { id: item.id } })"
+        @click="router.push(tournamentTarget(item))"
+        @keydown.enter="router.push(tournamentTarget(item))"
       >
         <div class="stack stack--sm" style="flex: 1; min-width: 0">
           <h2 class="tournament-row__title">{{ item.name }}</h2>
@@ -198,12 +231,13 @@ onMounted(async () => {
               {{ t(`tournament.${item.status}`) }}
             </span>
             <span class="badge badge--neutral">{{ t(`tournament.${item.category}`) }}</span>
+            <span v-if="item.currentRole" class="badge badge--neutral">{{ t(`admin.${item.currentRole}`) }}</span>
             <span class="muted" style="font-size: 0.8125rem">{{ formatDate(item.created_at) }}</span>
           </div>
         </div>
         <div class="tournament-row__actions">
           <button
-            v-if="hasPublicShareLink(item.status)"
+            v-if="item.currentRole !== 'counter' && hasPublicShareLink(item.status)"
             class="btn btn--ghost btn--sm"
             type="button"
             @click.stop="onCopyLink(item.slug, $event)"

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { entryMemberNames } from '../lib/entryDisplay'
+import { pointLabel, scoreLine } from '../lib/useTennisScoring'
 
 const props = defineProps({
   match: {
@@ -21,9 +22,17 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  liveScore: {
+    type: Object,
+    default: null,
+  },
+  canLiveScore: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['swap-slots'])
+const emit = defineEmits(['swap-slots', 'view-live'])
 
 const { t } = useI18n()
 
@@ -50,6 +59,12 @@ function setSummary(matchId) {
 }
 
 const matchFinished = () => props.match.status === 'finished'
+const hasLiveScore = () => props.liveScore?.status === 'active'
+const canScoreMatch = () =>
+  props.canLiveScore
+  && !matchFinished()
+  && Boolean(props.match.side_a_entry_id)
+  && Boolean(props.match.side_b_entry_id)
 
 function rowKey(side) {
   return `${props.match.id}-${side}`
@@ -136,6 +151,23 @@ function rowClass(side, entryId, winner) {
 
 <template>
   <article class="match-card" :data-match-id="match.id">
+    <div v-if="canScoreMatch()" class="match-card__meta match-card__meta--top">
+      <button
+        class="match-card__score-btn"
+        type="button"
+        :aria-label="t('live.start')"
+        @click="emit('view-live', match)"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="3" width="12" height="10" rx="1.5" />
+          <line x1="8" y1="3" x2="8" y2="13" />
+          <line x1="4.5" y1="6.5" x2="6" y2="6.5" />
+          <line x1="4.5" y1="9.5" x2="6" y2="9.5" />
+          <line x1="10" y1="6.5" x2="11.5" y2="6.5" />
+          <line x1="10" y1="9.5" x2="11.5" y2="9.5" />
+        </svg>
+      </button>
+    </div>
     <div
       class="match-card__row"
       :class="rowClass('a', match.side_a_entry_id, match.winner_entry_id === match.side_a_entry_id)"
@@ -168,6 +200,17 @@ function rowClass(side, entryId, winner) {
     </div>
     <div class="match-card__meta">
       {{ t('tournament.sets') }}: <span class="match-card__score">{{ setSummary(match.id) }}</span>
+      <button
+        v-if="hasLiveScore()"
+        class="match-card__live"
+        type="button"
+        @click="emit('view-live', match)"
+      >
+        <span class="live-dot"></span>
+        {{ t('live.live') }}
+        <span class="match-card__score">{{ scoreLine(liveScore.state) }}</span>
+        <span class="match-card__score">{{ pointLabel(liveScore.state, 'a') }}:{{ pointLabel(liveScore.state, 'b') }}</span>
+      </button>
     </div>
   </article>
 </template>

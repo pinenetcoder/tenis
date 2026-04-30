@@ -119,6 +119,17 @@ const router = createRouter({
           path: 'club',
           name: 'admin-club-settings',
           component: ClubSettingsView,
+          async beforeEnter() {
+            const auth = useAuthStore()
+            if (!auth.ready) await auth.init()
+            await auth.loadTournamentRoles()
+            const isCounterOnly =
+              auth.tournamentRoles.length > 0
+              && auth.tournamentRoles.every((r) => r === 'counter')
+              && auth.clubStatus !== 'active'
+            if (isCounterOnly) return { name: 'admin-tournaments' }
+            return true
+          },
         },
       ],
     },
@@ -151,6 +162,9 @@ router.beforeEach(async (to) => {
 
   const requiresActiveClub = to.matched.some((record) => record.meta.requiresActiveClub)
   if (requiresActiveClub && auth.user) {
+    if (to.name === 'admin-tournaments' || to.name === 'admin-tournament') {
+      return true
+    }
     if (auth.clubStatus === null) {
       await auth.checkClubStatus()
     }

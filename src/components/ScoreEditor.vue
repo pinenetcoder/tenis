@@ -26,9 +26,21 @@ const props = defineProps({
     type: String,
     default: 'singles',
   },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
+  canLiveScore: {
+    type: Boolean,
+    default: false,
+  },
+  liveScoresByMatch: {
+    type: Object,
+    default: () => ({}),
+  },
 })
 
-const emit = defineEmits(['saved'])
+const emit = defineEmits(['saved', 'start-live'])
 
 const { t } = useI18n()
 const setForms = reactive({})
@@ -108,11 +120,26 @@ function canScore(match) {
   return Boolean(match.side_a_entry_id && match.side_b_entry_id)
 }
 
+function liveStatus(matchId) {
+  return props.liveScoresByMatch[matchId]?.status || null
+}
+
 async function save(match) {
   const rows = setForms[match.id] || []
   rows.forEach((row) => {
     row.error = ''
   })
+
+  if (props.disabled) {
+    if (rows[0]) {
+      rows[0].error = t('admin.scoresLockedError')
+    }
+    return
+  }
+
+  if (!canScore(match)) {
+    return
+  }
 
   const payload = rows
     .filter((row) => row.side_a_games !== '' && row.side_b_games !== '' && row.side_a_games != null && row.side_b_games != null)
@@ -155,6 +182,7 @@ async function save(match) {
   <section class="card score-editor">
     <h2 class="section-title">{{ t('admin.saveScore') }}</h2>
     <p class="muted">{{ t('admin.setsHint') }}</p>
+    <p v-if="disabled" class="alert alert--info" role="status">{{ t('admin.scoresLockedError') }}</p>
 
     <template v-for="group in matchesByRound" :key="group.roundNumber">
       <h3 class="section-title" style="font-size: 1rem; margin-top: var(--space-3)">
@@ -206,7 +234,7 @@ async function save(match) {
                 min="0"
                 max="7"
                 class="score-grid__input"
-                :disabled="!canScore(match) || row.saving"
+                :disabled="disabled || !canScore(match) || row.saving"
                 :placeholder="'—'"
               />
             </div>
@@ -227,16 +255,29 @@ async function save(match) {
                 min="0"
                 max="7"
                 class="score-grid__input"
-                :disabled="!canScore(match) || row.saving"
+                :disabled="disabled || !canScore(match) || row.saving"
                 :placeholder="'—'"
               />
             </div>
           </div>
         </div>
 
-        <button class="btn btn--primary btn--sm" type="button" :disabled="!canScore(match)" @click="save(match)">
+        <button class="btn btn--primary btn--sm" type="button" :disabled="disabled || !canScore(match)" @click="save(match)">
           {{ t('admin.saveScore') }}
         </button>
+        <button
+          v-if="canLiveScore"
+          class="btn btn--ghost btn--sm"
+          type="button"
+          :disabled="!canScore(match)"
+          @click="emit('start-live', match)"
+        >
+          {{ liveStatus(match.id) === 'active' ? t('live.openLive') : t('live.start') }}
+        </button>
+        <span v-if="liveStatus(match.id) === 'active'" class="badge badge--warn">
+          <span class="live-dot"></span>
+          {{ t('live.live') }}
+        </span>
 
         <p v-if="(setForms[match.id] || [])[0]?.error" class="error-text" style="margin-top: var(--space-2)">
           {{ (setForms[match.id] || [])[0]?.error }}

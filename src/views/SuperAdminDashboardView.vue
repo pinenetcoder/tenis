@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 const { t } = useI18n()
 const auth = useAuthStore()
 
-const clubs = ref([])
+const reviewItems = ref([])
 const loading = ref(true)
 const filter = ref('pending')
 const rejectingId = ref(null)
@@ -15,26 +15,26 @@ const rejectReason = ref('')
 const actionLoading = ref(null)
 const errorText = ref('')
 
-const filteredClubs = computed(() => {
-  if (filter.value === 'all') return clubs.value
-  return clubs.value.filter(c => c.status === filter.value)
+const filteredReviewItems = computed(() => {
+  if (filter.value === 'all') return reviewItems.value
+  return reviewItems.value.filter(item => item.status === filter.value)
 })
 
 const counts = computed(() => {
-  const all = clubs.value
+  const all = reviewItems.value
   return {
-    pending: all.filter(c => c.status === 'pending').length,
-    active: all.filter(c => c.status === 'active').length,
-    rejected: all.filter(c => c.status === 'rejected').length,
+    pending: all.filter(item => item.status === 'pending').length,
+    active: all.filter(item => item.status === 'active').length,
+    rejected: all.filter(item => item.status === 'rejected').length,
     all: all.length,
   }
 })
 
 onMounted(async () => {
-  await loadClubs()
+  await loadReviewItems()
 })
 
-async function loadClubs() {
+async function loadReviewItems() {
   loading.value = true
   errorText.value = ''
   const { data, error } = await supabase.rpc('list_organizations_for_review')
@@ -42,12 +42,12 @@ async function loadClubs() {
     errorText.value = error.message
     console.error('list_organizations_for_review error:', error)
   } else {
-    clubs.value = data || []
+    reviewItems.value = data || []
   }
   loading.value = false
 }
 
-async function approveClub(id) {
+async function approveOrganization(id) {
   actionLoading.value = id
   errorText.value = ''
   const { error } = await supabase.rpc('approve_organization', { p_org_id: id })
@@ -55,7 +55,7 @@ async function approveClub(id) {
     errorText.value = error.message
   }
   if (!error) {
-    await loadClubs()
+    await loadReviewItems()
   }
   actionLoading.value = null
 }
@@ -84,7 +84,7 @@ async function confirmReject() {
   if (!error) {
     rejectingId.value = null
     rejectReason.value = ''
-    await loadClubs()
+    await loadReviewItems()
   }
   actionLoading.value = null
 }
@@ -133,63 +133,63 @@ function formatDate(dateStr) {
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="filteredClubs.length === 0" class="sa-empty">
+    <div v-else-if="filteredReviewItems.length === 0" class="sa-empty">
       <p>{{ t('superAdmin.empty') }}</p>
     </div>
 
     <!-- Club list -->
     <div v-else class="sa-list">
       <div
-        v-for="club in filteredClubs"
-        :key="club.id"
+        v-for="organization in filteredReviewItems"
+        :key="organization.id"
         class="sa-club-card"
-        :class="{ 'sa-club-card--duplicate': club.duplicate_count > 0 }"
+        :class="{ 'sa-club-card--duplicate': organization.duplicate_count > 0 }"
       >
         <div class="sa-club-header">
           <div>
-            <h3 class="sa-club-name">{{ club.name }}</h3>
-            <span class="sa-club-city">{{ club.city }}</span>
-            <span v-if="club.address" class="sa-club-address">&middot; {{ club.address }}</span>
+            <h3 class="sa-club-name">{{ organization.name }}</h3>
+            <span class="sa-club-city">{{ organization.city }}</span>
+            <span v-if="organization.address" class="sa-club-address">&middot; {{ organization.address }}</span>
           </div>
-          <span class="badge" :class="`badge--${club.status === 'active' ? 'success' : club.status === 'rejected' ? 'danger' : 'warning'}`">
-            {{ t(`superAdmin.status.${club.status}`) }}
+          <span class="badge" :class="`badge--${organization.status === 'active' ? 'success' : organization.status === 'rejected' ? 'danger' : 'warning'}`">
+            {{ t(`superAdmin.status.${organization.status}`) }}
           </span>
         </div>
 
-        <div v-if="club.duplicate_count > 0" class="alert alert--warning sa-duplicate-alert">
-          {{ t('superAdmin.duplicateWarning', { count: club.duplicate_count }) }}
+        <div v-if="organization.duplicate_count > 0" class="alert alert--warning sa-duplicate-alert">
+          {{ t('superAdmin.duplicateWarning', { count: organization.duplicate_count }) }}
         </div>
 
         <div class="sa-club-details">
           <div class="sa-detail">
             <span class="sa-detail-label">{{ t('superAdmin.owner') }}</span>
-            <span class="sa-detail-value">{{ club.owner_first_name }} {{ club.owner_last_name }}</span>
+            <span class="sa-detail-value">{{ organization.owner_first_name }} {{ organization.owner_last_name }}</span>
           </div>
           <div class="sa-detail">
             <span class="sa-detail-label">{{ t('clubRegistration.fields.email') }}</span>
-            <span class="sa-detail-value">{{ club.owner_email }}</span>
+            <span class="sa-detail-value">{{ organization.owner_email }}</span>
           </div>
-          <div class="sa-detail" v-if="club.owner_phone">
+          <div class="sa-detail" v-if="organization.owner_phone">
             <span class="sa-detail-label">{{ t('clubRegistration.fields.phone') }}</span>
-            <span class="sa-detail-value">{{ club.owner_phone }}</span>
+            <span class="sa-detail-value">{{ organization.owner_phone }}</span>
           </div>
           <div class="sa-detail">
             <span class="sa-detail-label">{{ t('superAdmin.submittedAt') }}</span>
-            <span class="sa-detail-value">{{ formatDate(club.created_at) }}</span>
+            <span class="sa-detail-value">{{ formatDate(organization.created_at) }}</span>
           </div>
-          <div class="sa-detail" v-if="club.contact_phone">
+          <div class="sa-detail" v-if="organization.contact_phone">
             <span class="sa-detail-label">{{ t('superAdmin.contactPhone') }}</span>
-            <span class="sa-detail-value">{{ club.contact_phone }}</span>
+            <span class="sa-detail-value">{{ organization.contact_phone }}</span>
           </div>
         </div>
 
-        <p v-if="club.status === 'rejected' && club.rejection_reason" class="sa-rejection-reason">
-          {{ t('superAdmin.rejectionReason') }}: {{ club.rejection_reason }}
+        <p v-if="organization.status === 'rejected' && organization.rejection_reason" class="sa-rejection-reason">
+          {{ t('superAdmin.rejectionReason') }}: {{ organization.rejection_reason }}
         </p>
 
         <!-- Actions for pending clubs -->
-        <div v-if="club.status === 'pending'" class="sa-club-actions">
-          <template v-if="rejectingId === club.id">
+        <div v-if="organization.status === 'pending'" class="sa-club-actions">
+          <template v-if="rejectingId === organization.id">
             <div class="form-field sa-reject-field">
               <textarea
                 v-model="rejectReason"
@@ -200,18 +200,18 @@ function formatDate(dateStr) {
             </div>
             <div class="sa-reject-actions">
               <button class="btn btn--ghost btn--sm" @click="cancelReject">{{ t('superAdmin.cancel') }}</button>
-              <button class="btn btn--danger btn--sm" :disabled="actionLoading === club.id" @click="confirmReject">
-                <span v-if="actionLoading === club.id" class="spinner" aria-hidden="true" />
+              <button class="btn btn--danger btn--sm" :disabled="actionLoading === organization.id" @click="confirmReject">
+                <span v-if="actionLoading === organization.id" class="spinner" aria-hidden="true" />
                 {{ t('superAdmin.confirmReject') }}
               </button>
             </div>
           </template>
           <template v-else>
-            <button class="btn btn--success btn--sm" :disabled="actionLoading === club.id" @click="approveClub(club.id)">
-              <span v-if="actionLoading === club.id" class="spinner" aria-hidden="true" />
+            <button class="btn btn--success btn--sm" :disabled="actionLoading === organization.id" @click="approveOrganization(organization.id)">
+              <span v-if="actionLoading === organization.id" class="spinner" aria-hidden="true" />
               {{ t('superAdmin.approve') }}
             </button>
-            <button class="btn btn--danger btn--sm" @click="startReject(club.id)">
+            <button class="btn btn--danger btn--sm" @click="startReject(organization.id)">
               {{ t('superAdmin.reject') }}
             </button>
           </template>

@@ -89,6 +89,10 @@ create policy organizations_platform_write on organizations
   for all using (is_platform_admin())
   with check (is_platform_admin());
 
+-- Legacy clubs are historical/backfill-only after this migration.
+drop policy if exists clubs_insert_authenticated on clubs;
+drop policy if exists clubs_update_superadmin on clubs;
+
 -- register_organization: profile + pending club organization in one transaction.
 create or replace function register_organization(
   p_first_name text,
@@ -373,9 +377,101 @@ begin
   );
 end $$;
 
+-- Backwards-compatible RPC wrappers. New writes stay in organizations.
+create or replace function register_club(
+  p_first_name text,
+  p_last_name text,
+  p_phone text,
+  p_club_name text,
+  p_club_city text,
+  p_club_address text default null,
+  p_contact_email text default null,
+  p_contact_phone text default null
+)
+returns uuid
+language sql
+security definer
+set search_path = public
+as $$
+  select register_organization(
+    p_first_name,
+    p_last_name,
+    p_phone,
+    p_club_name,
+    p_club_city,
+    p_club_address,
+    p_contact_email,
+    p_contact_phone
+  );
+$$;
+
+create or replace function approve_club(p_club_id uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  select approve_organization(p_club_id);
+$$;
+
+create or replace function reject_club(p_club_id uuid, p_reason text default null)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  select reject_organization(p_club_id, p_reason);
+$$;
+
+drop function if exists get_pending_clubs();
+create or replace function get_pending_clubs()
+returns table (
+  id uuid,
+  name text,
+  city text,
+  address text,
+  contact_email text,
+  contact_phone text,
+  status organization_status,
+  rejection_reason text,
+  created_at timestamptz,
+  reviewed_at timestamptz,
+  owner_first_name text,
+  owner_last_name text,
+  owner_email text,
+  owner_phone text,
+  duplicate_count bigint
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    id,
+    name,
+    city,
+    address,
+    contact_email,
+    contact_phone,
+    status,
+    rejection_reason,
+    created_at,
+    reviewed_at,
+    owner_first_name,
+    owner_last_name,
+    owner_email,
+    owner_phone,
+    duplicate_count
+  from list_organizations_for_review();
+$$;
+
 grant execute on function register_organization(text, text, text, text, text, text, text, text) to authenticated;
 grant execute on function approve_organization(uuid) to authenticated;
 grant execute on function reject_organization(uuid, text) to authenticated;
 grant execute on function list_organizations_for_review() to authenticated;
 grant execute on function my_club_registration() to authenticated;
 grant execute on function club_page_data(text) to anon, authenticated;
+grant execute on function register_club(text, text, text, text, text, text, text, text) to authenticated;
+grant execute on function approve_club(uuid) to authenticated;
+grant execute on function reject_club(uuid, text) to authenticated;
+grant execute on function get_pending_clubs() to authenticated;

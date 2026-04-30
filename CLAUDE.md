@@ -75,13 +75,13 @@ supabase/
 
 - **player_profiles** - player accounts linked to auth.users (display_name, phone, email, avatar_url)
 - **tournaments** - name, slug, category (singles/doubles), status (draft/registration_open/closed/in_progress/completed), set_format, draw_mode
-- **tournament_admins** - roles: owner, editor, counter
+- **tournament_admins** - roles: owner, editor, counter (`counter` can only run live scoring)
 - **entries** - player registrations with approval status (pending/approved/rejected), seed_order, optional user_id link
 - **entry_members** - individual player names (for doubles)
 - **matches** - bracket matches linked via `next_match_id` + `next_slot`, match_status
 - **match_sets** - set scores per match
 - **bracket_versions** - bracket snapshots for undo
-- **live_scores** - real-time point-by-point scoring state
+- **live_scores** - real-time point-by-point scoring state with JSON state, history, and optimistic revision
 
 ### Key PL/pgSQL Functions
 
@@ -90,7 +90,7 @@ supabase/
 - `update_match_sets()` - save scores + auto-propagate winner
 - `swap_bracket_slots()`, `apply_bracket_layout()` - manual bracket arrangement
 - `form_random_pairs()`, `form_manual_pairs()`, `split_pairs()` - doubles pairing
-- `start_live_match()`, `stop_live_match()` - live scoring lifecycle
+- `start_live_match()`, `record_point()`, `stop_live_match()` - live scoring lifecycle and point entry
 - `add_tournament_admin_by_email()` - co-organizer management
 
 ### Security
@@ -106,7 +106,7 @@ Tables `tournaments`, `entries`, `matches`, `match_sets`, `tournament_admins`, `
 ## Key Architecture Patterns
 
 - **Bracket:** Canvas-based (`InfiniteCanvas.vue`) with zoom/pan. Matches linked as tree via `next_match_id`/`next_slot`. Winner auto-propagates via DB trigger.
-- **Live Scoring:** `useTennisScoring.js` composable handles full tennis logic (points, games, sets, tiebreaks, deuce/advantage, undo via history stack). State synced via Supabase Realtime.
+- **Live Scoring:** `useTennisScoring.js` composable formats live state and mirrors tennis scoring concepts (points, games, sets, tiebreaks, deuce/advantage, undo history). Authoritative point application runs in Supabase RPC and state syncs via Supabase Realtime.
 - **Doubles:** Two modes - `pre_agreed` (register as pair) and `pick_random` (register solo, admin forms pairs).
 - **Tournaments accessed by slug** (user-friendly URLs for public sharing).
 
@@ -121,6 +121,7 @@ npm run build    # Production build to dist/
 
 ## General Rules
 
+- Always answer, provide progress updates, and write implementation plans in Russian unless the user explicitly asks for another language.
 - This is primarily a TypeScript project. Always use TypeScript (not JavaScript) for new files and maintain strict typing. Check for build errors (`npm run build`) after making changes.
 
 ## UI/Frontend Development

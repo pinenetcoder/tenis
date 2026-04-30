@@ -1,9 +1,10 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import BracketBoard from '../components/BracketBoard.vue'
+import LiveScoringModal from '../components/LiveScoringModal.vue'
 import ScoreEditor from '../components/ScoreEditor.vue'
 import { entryMemberNames } from '../lib/entryDisplay'
 import { supabase } from '../lib/supabase'
@@ -25,7 +26,9 @@ const tournament = ref(null)
 const entries = ref([])
 const matches = ref([])
 const matchSets = ref([])
+const liveScores = ref([])
 const admins = ref([])
+const currentUserRole = ref(null)
 
 const loading = ref(false)
 const actionLoading = ref(false)
@@ -54,6 +57,7 @@ const settingsBaseline = ref({
 const drawMode = ref('auto-random')
 const bracketEditing = ref(false)
 const localMatches = ref([])
+const selectedLiveMatch = ref(null)
 
 const addAdminForm = reactive({
   email: '',
@@ -114,6 +118,13 @@ const setsByMatch = computed(() => {
   }, {})
 })
 
+const liveScoresByMatch = computed(() => {
+  return liveScores.value.reduce((acc, item) => {
+    acc[item.match_id] = item
+    return acc
+  }, {})
+})
+
 const pendingEntries = computed(() => entries.value.filter((entry) => entry.status === 'pending'))
 const approvedEntries = computed(() => entries.value.filter((entry) => entry.status === 'approved'))
 
@@ -157,6 +168,17 @@ function entryLabel(entry) {
   return names.length ? names.join(' / ') : entry.display_name
 }
 
+function teamLabel(entryId) {
+  if (!entryId) {
+    return t('bracket.tbd')
+  }
+  const entry = entriesMap.value[entryId]
+  if (!entry) {
+    return t('bracket.tbd')
+  }
+  return entryLabel(entry)
+}
+
 const showPublicShareActions = computed(() => {
   return tournament.value?.status !== 'draft'
 })
@@ -180,10 +202,14 @@ const hasTournamentSettingsChanges = computed(() => {
 const canStartTournament = computed(() => tournament.value?.status === 'registration_closed')
 const isTournamentActive = computed(() => tournament.value?.status === 'in_progress')
 const isTournamentFinished = computed(() => tournament.value?.status === 'completed')
+const canManageTournament = computed(() => currentUserRole.value === 'owner' || currentUserRole.value === 'editor')
+const canLiveScoreRole = computed(() => ['owner', 'editor', 'counter'].includes(currentUserRole.value))
+const canEditScores = computed(() => isTournamentActive.value && canLiveScoreRole.value)
+const canEditFinalScores = computed(() => isTournamentActive.value && canManageTournament.value)
 
 const showStartButton = computed(() => {
   const s = tournament.value?.status
-  return s === 'draft' || s === 'registration_open' || s === 'registration_closed'
+  return canManageTournament.value && (s === 'draft' || s === 'registration_open' || s === 'registration_closed')
 })
 
 const isSettingsDropdownDisabled = computed(() => isTournamentActive.value || isTournamentFinished.value)
@@ -258,12 +284,9 @@ async function stopTournament() {
 }
 
 async function assertAccess() {
-  const { data, error } = await supabase
-    .from('tournament_admins')
-    .select('id')
-    .eq('tournament_id', props.id)
-    .eq('user_id', auth.user.id)
-    .maybeSingle()
+  const { data, error } = await supabase.rpc('get_my_tournament_role', {
+    p_tournament_id: props.id,
+  })
 
   if (error) {
     throw error
@@ -272,6 +295,8 @@ async function assertAccess() {
   if (!data) {
     throw new Error(t('errors.noAccess'))
   }
+
+  currentUserRole.value = data
 }
 
 async function loadTournament() {
@@ -360,6 +385,7 @@ async function loadMatchesAndSets() {
 
   if (!matches.value.length) {
     matchSets.value = []
+    liveScores.value = []
     return
   }
 
@@ -376,6 +402,17 @@ async function loadMatchesAndSets() {
   }
 
   matchSets.value = setsData || []
+
+  const { data: liveData, error: liveError } = await supabase
+    .from('live_scores')
+    .select('id, match_id, tournament_id, status, state, history, revision, created_at, updated_at')
+    .eq('tournament_id', props.id)
+
+  if (liveError) {
+    throw liveError
+  }
+
+  liveScores.value = liveData || []
 }
 
 async function loadAdmins() {
@@ -403,7 +440,11 @@ async function loadAll() {
   try {
     await assertAccess()
     await loadTournament()
-    await Promise.all([loadEntries(), loadMatchesAndSets(), loadAdmins()])
+    await Promise.all([
+      loadEntries(),
+      loadMatchesAndSets(),
+      canManageTournament.value ? loadAdmins() : Promise.resolve((admins.value = [])),
+    ])
     setupRealtime()
   } catch (error) {
     errorText.value = error.message || t('errors.generic')
@@ -425,8 +466,58 @@ function onMatchSetsChange(payload) {
     return
   }
   const belongsToTournament = matches.value.some((m) => m.id === matchId)
-  if (belongsToTournament) {
-    scheduleReload()
+  if (!belongsToTournament) {
+    return
+  }
+  if (payload.eventType === 'DELETE') {
+    if (!payload.old?.id) return
+    matchSets.value = matchSets.value.filter((row) => row.id !== payload.old.id)
+    return
+  }
+  if (!payload.new?.id) return
+  const idx = matchSets.value.findIndex((row) => row.id === payload.new.id)
+  if (idx >= 0) {
+    matchSets.value[idx] = payload.new
+  } else {
+    matchSets.value = [...matchSets.value, payload.new]
+  }
+}
+
+function onMatchesChange(payload) {
+  const tournamentId = payload.new?.tournament_id || payload.old?.tournament_id
+  if (tournamentId !== props.id) {
+    return
+  }
+  if (payload.eventType === 'DELETE') {
+    if (!payload.old?.id) return
+    matches.value = matches.value.filter((row) => row.id !== payload.old.id)
+    return
+  }
+  if (!payload.new?.id) return
+  const idx = matches.value.findIndex((row) => row.id === payload.new.id)
+  if (idx >= 0) {
+    matches.value[idx] = { ...matches.value[idx], ...payload.new }
+  } else {
+    matches.value = [...matches.value, payload.new]
+  }
+}
+
+function onLiveScoresChange(payload) {
+  const tournamentId = payload.new?.tournament_id || payload.old?.tournament_id
+  if (tournamentId !== props.id) {
+    return
+  }
+  if (payload.eventType === 'DELETE') {
+    if (!payload.old?.id) return
+    liveScores.value = liveScores.value.filter((row) => row.id !== payload.old.id)
+    return
+  }
+  if (!payload.new?.id) return
+  const idx = liveScores.value.findIndex((row) => row.id === payload.new.id)
+  if (idx >= 0) {
+    liveScores.value[idx] = payload.new
+  } else {
+    liveScores.value = [...liveScores.value, payload.new]
   }
 }
 
@@ -439,8 +530,9 @@ function setupRealtime() {
     .channel(`admin-${props.id}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tournaments', filter: `id=eq.${props.id}` }, scheduleReload)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'entries', filter: `tournament_id=eq.${props.id}` }, scheduleReload)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `tournament_id=eq.${props.id}` }, scheduleReload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `tournament_id=eq.${props.id}` }, onMatchesChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'match_sets' }, onMatchSetsChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'live_scores', filter: `tournament_id=eq.${props.id}` }, onLiveScoresChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_admins', filter: `tournament_id=eq.${props.id}` }, scheduleReload)
 
   channel.subscribe()
@@ -1088,48 +1180,95 @@ function statusBadgeClass(status) {
 
 const TABS = ['entries', 'bracket', 'scores', 'settings']
 
+function isTabEnabled(tab) {
+  if (!canManageTournament.value) {
+    return tab === 'bracket'
+  }
+  return tab !== 'scores' || canEditScores.value
+}
+
+const enabledTabs = computed(() => TABS.filter(isTabEnabled))
+
 function readHashTab() {
   const h = window.location.hash.replace('#', '')
-  return TABS.includes(h) ? h : 'entries'
+  const fallback = canManageTournament.value ? 'entries' : 'bracket'
+  if (!TABS.includes(h)) return fallback
+  return isTabEnabled(h) ? h : fallback
 }
 
 const activeTab = ref(readHashTab())
 
 function setTab(tab) {
+  if (!TABS.includes(tab) || !isTabEnabled(tab)) {
+    return
+  }
   activeTab.value = tab
   history.replaceState(null, '', `#${tab}`)
 }
 
+function syncTabFromHash() {
+  const requestedTab = window.location.hash.replace('#', '')
+  const nextTab = readHashTab()
+  if (requestedTab && requestedTab !== nextTab) {
+    setTab(nextTab)
+    return
+  }
+  activeTab.value = nextTab
+}
+
 function onHashChange() {
-  activeTab.value = readHashTab()
+  syncTabFromHash()
 }
 
 function onTabKeydown(event) {
-  const idx = TABS.indexOf(activeTab.value)
+  const tabs = enabledTabs.value
+  if (!tabs.length) return
+  const idx = Math.max(tabs.indexOf(activeTab.value), 0)
   let next = -1
   if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-    next = (idx + 1) % TABS.length
+    next = (idx + 1) % tabs.length
   } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-    next = (idx - 1 + TABS.length) % TABS.length
+    next = (idx - 1 + tabs.length) % tabs.length
   } else if (event.key === 'Home') {
     next = 0
   } else if (event.key === 'End') {
-    next = TABS.length - 1
+    next = tabs.length - 1
   }
   if (next >= 0) {
     event.preventDefault()
-    setTab(TABS[next])
+    setTab(tabs[next])
     nextTick(() => {
-      const btn = document.getElementById(`tab-${TABS[next]}`)
+      const btn = document.getElementById(`tab-${tabs[next]}`)
       btn?.focus()
     })
   }
 }
 
+watch(canEditScores, () => {
+  if (!isTabEnabled(activeTab.value)) {
+    setTab(canManageTournament.value ? 'entries' : 'bracket')
+  }
+})
+
+watch(canManageTournament, () => {
+  if (!isTabEnabled(activeTab.value)) {
+    setTab(canManageTournament.value ? 'entries' : 'bracket')
+  }
+})
+
+function openLiveScoring(match) {
+  selectedLiveMatch.value = match
+}
+
+const selectedLiveScore = computed(() => (
+  selectedLiveMatch.value ? liveScoresByMatch.value[selectedLiveMatch.value.id] : null
+))
+
 onMounted(async () => {
   window.addEventListener('hashchange', onHashChange)
   await auth.init()
   await loadAll()
+  syncTabFromHash()
 })
 
 onBeforeUnmount(() => {
@@ -1174,7 +1313,7 @@ onBeforeUnmount(() => {
             </div>
             <p v-if="tournament.description" class="muted">{{ tournament.description }}</p>
           </div>
-          <div class="admin-tournament-overview__actions">
+          <div v-if="canManageTournament" class="admin-tournament-overview__actions">
             <button
               v-if="showPublicShareActions"
               class="btn btn--warn btn--sm"
@@ -1215,6 +1354,7 @@ onBeforeUnmount(() => {
 
       <div role="tablist" class="tab-group" @keydown="onTabKeydown">
         <button
+          v-if="canManageTournament"
           id="tab-entries"
           role="tab"
           class="tab"
@@ -1228,6 +1368,7 @@ onBeforeUnmount(() => {
           <span v-if="pendingEntries.length" class="tab__badge">{{ pendingEntries.length }}</span>
         </button>
         <button
+          v-if="canManageTournament"
           id="tab-bracket"
           role="tab"
           class="tab"
@@ -1239,19 +1380,24 @@ onBeforeUnmount(() => {
         >
           {{ t('admin.tabBracket') }}
         </button>
+        <span class="tooltip-wrapper" :data-tooltip="!canEditScores ? t('admin.scoresLockedTooltip') : undefined">
+          <button
+            id="tab-scores"
+            role="tab"
+            class="tab"
+            :class="{ 'tab--active': activeTab === 'scores' }"
+            :aria-selected="activeTab === 'scores'"
+            :aria-disabled="!canEditScores"
+            :tabindex="activeTab === 'scores' ? 0 : -1"
+            :disabled="!canEditScores"
+            aria-controls="panel-scores"
+            @click="setTab('scores')"
+          >
+            {{ t('admin.tabScores') }}
+          </button>
+        </span>
         <button
-          id="tab-scores"
-          role="tab"
-          class="tab"
-          :class="{ 'tab--active': activeTab === 'scores' }"
-          :aria-selected="activeTab === 'scores'"
-          :tabindex="activeTab === 'scores' ? 0 : -1"
-          aria-controls="panel-scores"
-          @click="setTab('scores')"
-        >
-          {{ t('admin.tabScores') }}
-        </button>
-        <button
+          v-if="canManageTournament"
           id="tab-settings"
           role="tab"
           class="tab"
@@ -1266,6 +1412,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div
+        v-if="canManageTournament"
         id="panel-entries"
         role="tabpanel"
         aria-labelledby="tab-entries"
@@ -1460,7 +1607,13 @@ onBeforeUnmount(() => {
             <div v-if="approvedEntries.length" class="stack stack--sm">
               <div v-for="entry in approvedEntries" :key="entry.id" class="participant-item">
                 <strong>{{ entryLabel(entry) }}</strong>
-                <button class="btn btn--ghost btn--sm" type="button" :disabled="actionLoading" @click="updateEntryStatus(entry.id, 'pending')">
+                <button
+                  v-if="!isTournamentActive && !isTournamentFinished"
+                  class="btn btn--ghost btn--sm"
+                  type="button"
+                  :disabled="actionLoading"
+                  @click="updateEntryStatus(entry.id, 'pending')"
+                >
                   {{ t('admin.reopen') }}
                 </button>
               </div>
@@ -1692,13 +1845,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div
+        v-if="canManageTournament || canLiveScoreRole"
         id="panel-bracket"
         role="tabpanel"
         aria-labelledby="tab-bracket"
         class="tab-panel"
         :class="{ 'tab-panel--active': activeTab === 'bracket' }"
       >
-        <section v-if="!isTournamentActive" class="card stack stack--sm">
+        <section v-if="canManageTournament && !isTournamentActive" class="card stack stack--sm">
           <h2 class="section-title">{{ t('tournament.bracket') }} — {{ t('admin.drawSection') }}</h2>
 
           <div class="form-field" style="max-width: 280px">
@@ -1747,11 +1901,14 @@ onBeforeUnmount(() => {
         <section class="card stack stack--sm" style="margin-top: var(--space-4)">
           <BracketBoard
             :matches="displayMatches"
-            :sets-by-match="setsByMatch"
-            :entries-map="entriesMap"
-            :editable-slots="drawMode === 'manual' && !actionLoading"
-            @swap-slots="swapBracketSlots"
-          />
+          :sets-by-match="setsByMatch"
+          :entries-map="entriesMap"
+          :live-scores-by-match="liveScoresByMatch"
+          :editable-slots="canManageTournament && drawMode === 'manual' && !actionLoading"
+          :can-live-score="canEditScores"
+          @swap-slots="swapBracketSlots"
+          @view-live="openLiveScoring"
+        />
           <div v-if="bracketEditing" class="inline-actions" style="margin-top: var(--space-2)">
             <button
               class="btn btn--primary btn--sm"
@@ -1786,11 +1943,16 @@ onBeforeUnmount(() => {
           :entries-map="entriesMap"
           :set-format="tournament.set_format"
           :category="tournament.category"
+          :disabled="!canEditFinalScores"
+          :can-live-score="canEditScores"
+          :live-scores-by-match="liveScoresByMatch"
           @saved="loadAll"
+          @start-live="openLiveScoring"
         />
       </div>
 
       <div
+        v-if="canManageTournament"
         id="panel-settings"
         role="tabpanel"
         aria-labelledby="tab-settings"
@@ -1915,6 +2077,7 @@ onBeforeUnmount(() => {
               <label for="adm-role">{{ t('admin.role') }}</label>
               <select id="adm-role" v-model="addAdminForm.role" class="input">
                 <option value="editor">{{ t('admin.editor') }}</option>
+                <option value="counter">{{ t('admin.counter') }}</option>
                 <option value="owner">{{ t('admin.owner') }}</option>
               </select>
             </div>
@@ -1944,6 +2107,15 @@ onBeforeUnmount(() => {
           </button>
         </section>
       </div>
+
+      <LiveScoringModal
+        v-if="selectedLiveMatch"
+        :match="selectedLiveMatch"
+        :live-score="selectedLiveScore"
+        :team-a="teamLabel(selectedLiveMatch.side_a_entry_id)"
+        :team-b="teamLabel(selectedLiveMatch.side_b_entry_id)"
+        @close="selectedLiveMatch = null"
+      />
     </template>
   </div>
 </template>

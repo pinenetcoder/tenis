@@ -14,7 +14,17 @@ export const useAuthStore = defineStore('auth', {
     memberships: [],           // active org memberships
     ownedOrganizations: [],    // orgs where user is owner or admin
     playerContextLoaded: false,
+    tournamentRoles: [],        // 'owner'|'editor'|'counter' for all assigned tournaments
+    tournamentRolesLoaded: false,
   }),
+  getters: {
+    isCounterOnly(state) {
+      if (!state.tournamentRolesLoaded) return false
+      if (state.tournamentRoles.length === 0) return false
+      if (state.clubStatus === 'active') return false
+      return state.tournamentRoles.every((role) => role === 'counter')
+    },
+  },
   actions: {
     async init() {
       if (this.ready) {
@@ -40,6 +50,8 @@ export const useAuthStore = defineStore('auth', {
             this.memberships = []
             this.ownedOrganizations = []
             this.playerContextLoaded = false
+            this.tournamentRoles = []
+            this.tournamentRolesLoaded = false
           }
         })
         authSubscription = subscriptionData.subscription
@@ -107,6 +119,14 @@ export const useAuthStore = defineStore('auth', {
       return data
     },
 
+    async loadTournamentRoles({ force = false } = {}) {
+      if (!this.user) { this.tournamentRoles = []; this.tournamentRolesLoaded = true; return }
+      if (this.tournamentRolesLoaded && !force) return
+      const { data } = await supabase.from('tournament_admins').select('role').eq('user_id', this.user.id)
+      this.tournamentRoles = (data ?? []).map((r) => r.role)
+      this.tournamentRolesLoaded = true
+    },
+
     async checkClubStatus() {
       if (!this.user) {
         this.clubStatus = null
@@ -137,6 +157,8 @@ export const useAuthStore = defineStore('auth', {
       }
       this.user = null
       this.session = null
+      this.tournamentRoles = []
+      this.tournamentRolesLoaded = false
     },
   },
 })

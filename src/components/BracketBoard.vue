@@ -22,9 +22,17 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  liveScoresByMatch: {
+    type: Object,
+    default: () => ({}),
+  },
+  canLiveScore: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['swap-slots'])
+const emit = defineEmits(['swap-slots', 'view-live'])
 
 const { t } = useI18n()
 
@@ -261,7 +269,7 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.matches, props.setsByMatch],
+  () => [props.matches, props.setsByMatch, props.entriesMap, props.liveScoresByMatch],
   () => scheduleUpdate(),
   { deep: true },
 )
@@ -306,7 +314,10 @@ watch(splitSectionsFlat, () => scheduleUpdate(), { deep: true })
             :sets-by-match="setsByMatch"
             :entries-map="entriesMap"
             :editable-slots="editableSlots"
+            :live-score="liveScoresByMatch[match.id]"
+            :can-live-score="canLiveScore"
             @swap-slots="emit('swap-slots', $event)"
+            @view-live="emit('view-live', $event)"
           />
         </section>
       </div>
@@ -321,7 +332,10 @@ watch(splitSectionsFlat, () => scheduleUpdate(), { deep: true })
             :sets-by-match="setsByMatch"
             :entries-map="entriesMap"
             :editable-slots="editableSlots"
+            :live-score="liveScoresByMatch[match.id]"
+            :can-live-score="canLiveScore"
             @swap-slots="emit('swap-slots', $event)"
+            @view-live="emit('view-live', $event)"
           />
         </section>
       </div>
